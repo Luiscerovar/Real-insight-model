@@ -62,16 +62,16 @@ for idx, loan in enumerate(tranches):
             principal_payment = 0 if t < term-1 else principal * (1 - balloon)
             pmt = principal_payment + interest
         if f"{prefix} Interest" not in cf_data.columns:
-    		cf_data[f"{prefix} Interest"] = 0
-	cf_data.loc[year, f"{prefix} Interest"] += interest
+            cf_data[f"{prefix} Interest"] = 0
+        cf_data.loc[year, f"{prefix} Interest"] += interest
 
-	if f"{prefix} Principal" not in cf_data.columns:
-    		cf_data[f"{prefix} Principal"] = 0
-	cf_data.loc[year, f"{prefix} Principal"] += principal_payment
+        if f"{prefix} Principal" not in cf_data.columns:
+            cf_data[f"{prefix} Principal"] = 0
+        cf_data.loc[year, f"{prefix} Principal"] += principal_payment
 
-	if f"{prefix} Balloon" not in cf_data.columns:
-    		cf_data[f"{prefix} Balloon"] = 0
-	cf_data.loc[year, f"{prefix} Balloon"] += principal * balloon
+        if f"{prefix} Balloon" not in cf_data.columns:
+            cf_data[f"{prefix} Balloon"] = 0
+        cf_data.loc[year, f"{prefix} Balloon"] += principal * balloon
 
 # Summarize Cash Flows
 cf_data["Total Debt Service"] = cf_data.filter(like="Interest").sum(axis=1) + cf_data.filter(like="Principal").sum(axis=1) + cf_data.filter(like="Balloon").sum(axis=1)
