@@ -1,84 +1,81 @@
+
 import streamlit as st
 import pandas as pd
-import numpy as np
-import numpy_financial as npf
 
 st.set_page_config(page_title="Real Insight Financial Model", layout="wide")
+
 st.title("📊 Real Insight Financial Model")
+st.markdown("Upload or input your **historical financials** and set assumptions for projections.")
 
-st.markdown("""
-This tool helps model debt structures including:
-- Multiple loan tranches
-- Refinancing
-- Balloon payments
-- Cash flow-linked amortization
-""")
+# --- Tabs for structure ---
+tabs = st.tabs(["📁 Historical Data", "⚙️ Assumptions"])
 
-# Input Section
-st.header("📝 Loan Input Configuration")
+# --- Tab 1: Historical Data ---
+with tabs[0]:
+    st.header("📁 Upload or Input Historical Financials")
 
-with st.expander("Loan Tranches"):
-    num_tranches = st.number_input("Number of Tranches", 1, 10, 2)
-    tranches = []
-    for i in range(num_tranches):
-        st.subheader(f"Tranche {i+1}")
-        amount = st.number_input(f"Amount (Tranche {i+1})", min_value=0.0, step=1000.0, key=f"amount_{i}")
-        rate = st.number_input(f"Interest Rate % (Tranche {i+1})", min_value=0.0, max_value=100.0, value=8.0, key=f"rate_{i}")
-        years = st.number_input(f"Term (years) (Tranche {i+1})", 1, 30, 5, key=f"years_{i}")
-        start_year = st.number_input(f"Disbursement Year (Tranche {i+1})", 0, 10, i, key=f"start_{i}")
-        method = st.selectbox(f"Amortization Method (Tranche {i+1})", ["Francesa", "Alemana", "Americana"], key=f"method_{i}")
-        balloon = st.number_input(f"Balloon % at maturity (Tranche {i+1})", 0.0, 100.0, 0.0, key=f"balloon_{i}")
-        tranches.append({
-            "amount": amount, "rate": rate/100, "years": years,
-            "start_year": start_year, "method": method, "balloon": balloon / 100
+    st.subheader("Income Statement")
+    uploaded_is = st.file_uploader("Upload Income Statement (.xlsx, .csv)", key="is_upload")
+    if uploaded_is:
+        if uploaded_is.name.endswith(".csv"):
+            df_is = pd.read_csv(uploaded_is)
+        else:
+            df_is = pd.read_excel(uploaded_is)
+    else:
+        # Sample placeholder income statement data
+        df_is = pd.DataFrame({
+            "Year": [2022, 2023, 2024],
+            "Revenue": [100000, 120000, 140000],
+            "COGS": [40000, 48000, 56000],
+            "Operating Expenses": [30000, 33000, 36000],
+            "Net Income": [20000, 26000, 30000]
         })
 
-# Projection Setup
-years = list(range(0, 15))
-cf_data = pd.DataFrame(index=years)
-cf_data["Operating Cash Flow"] = 100000  # Dummy value
+    df_is = st.data_editor(df_is, num_rows="dynamic", key="income_statement")
 
-# Amortization Schedule + Cash Flow Impact
-for idx, loan in enumerate(tranches):
-    prefix = f"T{idx+1}"
-    principal = loan["amount"]
-    rate = loan["rate"]
-    term = loan["years"]
-    start = loan["start_year"]
-    method = loan["method"]
-    balloon = loan["balloon"]
-    for t in range(term):
-        year = start + t
-        if method == "Francesa":
-            pmt = npf.pmt(rate, term, -principal)
-            interest = npf.ipmt(rate, t+1, term, -principal)
-            principal_payment = pmt - interest
-        elif method == "Alemana":
-            principal_payment = principal / term
-            interest = (principal - principal_payment * t) * rate
-            pmt = principal_payment + interest
-        elif method == "Americana":
-            interest = principal * rate if t < term-1 else principal * rate
-            principal_payment = 0 if t < term-1 else principal * (1 - balloon)
-            pmt = principal_payment + interest
-        if f"{prefix} Interest" not in cf_data.columns:
-            cf_data[f"{prefix} Interest"] = 0
-        cf_data.loc[year, f"{prefix} Interest"] += interest
+    st.subheader("Balance Sheet")
+    uploaded_bs = st.file_uploader("Upload Balance Sheet (.xlsx, .csv)", key="bs_upload")
+    if uploaded_bs:
+        if uploaded_bs.name.endswith(".csv"):
+            df_bs = pd.read_csv(uploaded_bs)
+        else:
+            df_bs = pd.read_excel(uploaded_bs)
+    else:
+        # Sample placeholder balance sheet data
+        df_bs = pd.DataFrame({
+            "Year": [2022, 2023, 2024],
+            "Cash": [10000, 12000, 15000],
+            "Accounts Receivable": [15000, 17000, 20000],
+            "Inventory": [10000, 11000, 12000],
+            "Fixed Assets": [50000, 52000, 54000],
+            "Accounts Payable": [12000, 13000, 14000],
+            "Debt": [20000, 18000, 16000],
+            "Equity": [53000, 61000, 71000]
+        })
 
-        if f"{prefix} Principal" not in cf_data.columns:
-            cf_data[f"{prefix} Principal"] = 0
-        cf_data.loc[year, f"{prefix} Principal"] += principal_payment
+    df_bs = st.data_editor(df_bs, num_rows="dynamic", key="balance_sheet")
 
-        if f"{prefix} Balloon" not in cf_data.columns:
-            cf_data[f"{prefix} Balloon"] = 0
-        cf_data.loc[year, f"{prefix} Balloon"] += principal * balloon
+# --- Tab 2: Assumptions ---
+with tabs[1]:
+    st.header("⚙️ Assumptions for Projections")
 
-# Summarize Cash Flows
-cf_data["Total Debt Service"] = cf_data.filter(like="Interest").sum(axis=1) + cf_data.filter(like="Principal").sum(axis=1) + cf_data.filter(like="Balloon").sum(axis=1)
-cf_data["Net Cash Flow"] = cf_data["Operating Cash Flow"] - cf_data["Total Debt Service"]
+    col1, col2, col3 = st.columns(3)
 
-# Output
-st.header("📈 Cash Flow Projection")
-st.dataframe(cf_data.fillna(0).style.format("{:,.0f}"))
+    with col1:
+        revenue_growth = st.number_input("Revenue Growth (%)", value=10.0)
+        cogs_pct = st.number_input("COGS (% of Revenue)", value=40.0)
+        sgna_pct = st.number_input("Operating Expenses (% of Revenue)", value=25.0)
 
-st.line_chart(cf_data[["Operating Cash Flow", "Total Debt Service", "Net Cash Flow"]].fillna(0))
+    with col2:
+        tax_rate = st.number_input("Tax Rate (%)", value=25.0)
+        capex_pct = st.number_input("CapEx (% of Revenue)", value=5.0)
+        depreciation_years = st.number_input("Useful Life for New Assets (years)", value=5)
+
+    with col3:
+        ar_days = st.number_input("Accounts Receivable Days", value=45)
+        inventory_days = st.number_input("Inventory Days", value=60)
+        ap_days = st.number_input("Accounts Payable Days", value=30)
+
+    st.markdown("These assumptions will be used for projecting P&L, Balance Sheet, and Cash Flow in the next step.")
+
+st.success("✅ Step 1 complete. You can now proceed to build projections.")
