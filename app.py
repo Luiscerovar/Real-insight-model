@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
+import numpy_financial as npf
 
 st.set_page_config(page_title="Real Insight Financial Model", layout="wide")
 st.title("📊 Real Insight Financial Model")
@@ -49,8 +50,8 @@ for idx, loan in enumerate(tranches):
     for t in range(term):
         year = start + t
         if method == "Francesa":
-            pmt = np.pmt(rate, term, -principal)
-            interest = np.ipmt(rate, t+1, term, -principal)
+            pmt = npf.pmt(rate, term, -principal)
+            interest = npf.ipmt(rate, t+1, term, -principal)
             principal_payment = pmt - interest
         elif method == "Alemana":
             principal_payment = principal / term
