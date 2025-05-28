@@ -96,7 +96,7 @@ with tabs[2]:
     except Exception as e:
         st.warning(f"Could not calculate projections: {e}")
      
-        st.subheader("📘 Projected Balance Sheet")
+    st.subheader("📘 Projected Balance Sheet")
 
     projected_bs = pd.DataFrame(index=[
         "Cash", "Accounts Receivable", "Inventory", "Fixed Assets",
@@ -134,7 +134,7 @@ with tabs[2]:
 
     st.dataframe(projected_bs.style.format("{:,.0f}"))
 
-          st.subheader("💵 Projected Cash Flow Statement")
+    st.subheader("💵 Projected Cash Flow Statement")
 
     projected_cf = pd.DataFrame(index=[
         "Net Income",
