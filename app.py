@@ -62,7 +62,7 @@ with tabs[0]:
 
     df_bs = st.data_editor(df_bs, num_rows="dynamic", key="balance_sheet")
     
-        st.subheader(t("📋 Input Historical Financials","📋 Ingrese Data Histórica"))
+    st.subheader(t("📋 Input Historical Financials","📋 Ingrese Data Histórica"))
 
     st.markdown("#### Income Statement History")
     hist_is = st.data_editor(
