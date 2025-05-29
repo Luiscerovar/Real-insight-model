@@ -26,6 +26,18 @@ st.markdown("""
 # App title
 st.title("📊 Real Insight Financial Model")
 
+projection_type = st.selectbox("Projection Type", ["Yearly", "Monthly"])
+
+if projection_type == "Yearly":
+    projection_duration = st.slider("Projection Duration (Years)", 1, 10, 3)
+    periods = [str(pd.to_datetime("today").year + i) for i in range(1, projection_duration + 1)]
+else:
+    projection_duration = st.slider("Projection Duration (Months)", 1, 60, 12)
+    start_date = pd.to_datetime("today")
+    periods = [(start_date + pd.DateOffset(months=i)).strftime("%b-%Y") for i in range(1, projection_duration + 1)]
+
+st.write(f"Projecting {projection_duration} {projection_type.lower()} period(s):")
+
 tabs = st.tabs(["📁 Historical Data", "⚙️ Assumptions", "📊 Summary"])
 
 # --- Tab 1: Historical Data ---
