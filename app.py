@@ -2,6 +2,8 @@
 import streamlit as st
 import pandas as pd
 
+st.set_page_config(page_title="Real Insight Model", layout="wide")
+
 language = st.radio("Choose Language / Elija idioma", ["English", "Español"])
 
 def t(en, es):
