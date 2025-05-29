@@ -104,13 +104,7 @@ with tabs[0]:
 
 # --- Tab 2: Assumptions ---
 with tabs[1]:
-    st.subheader(t("Projection Settings", "Configuración de Proyección"))
-
-    freq = st.radio("Projection Frequency", ["Yearly", "Monthly"])
-    if freq == "Yearly":
-        num_periods = st.slider("Number of Years", 1, 10, 3)
-    else:
-        num_periods = st.slider("Number of Months", 1, 60, 12)
+    
     
     st.header(t("⚙️ Assumptions for Projections", "⚙️ Supuestos para proyectar"))
     col1, col2, col3 = st.columns(3)
