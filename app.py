@@ -92,6 +92,14 @@ with tabs[0]:
 
 # --- Tab 2: Assumptions ---
 with tabs[1]:
+    st.subheader(t("Projection Settings", "Configuración de Proyección"))
+
+    freq = st.radio("Projection Frequency", ["Yearly", "Monthly"])
+    if freq == "Yearly":
+        num_periods = st.slider("Number of Years", 1, 10, 3)
+    else:
+        num_periods = st.slider("Number of Months", 1, 60, 12)
+    
     st.header(t("⚙️ Assumptions for Projections", "⚙️ Supuestos para proyectar"))
     col1, col2, col3 = st.columns(3)
 
@@ -115,8 +123,14 @@ with tabs[2]:
     st.header(t("📊 Projected Financial Summary", "📊 Resumen de Estados Financieros Proyectados"))
 
     try:
-        last_year = max([int(y) for y in df_is.columns])
-        projection_years = [str(last_year + i) for i in range(1, 4)]
+        import datetime
+
+        if freq == "Yearly":
+            start_year = max([int(y) for y in df_is.columns])
+            projection_periods = [str(start_year + i) for i in range(1, num_periods + 1)]
+        else:
+            start = datetime.date(max([int(y) for y in df_is.columns]), 1, 1)
+            projection_periods = [(start + datetime.timedelta(days=30 * i)).strftime("%b %Y") for i in range(1, num_periods + 1)]
 
         projected_is = pd.DataFrame(index=["Revenue", "COGS", "Operating Expenses", "EBIT", "Tax", "Net Income"])
 
