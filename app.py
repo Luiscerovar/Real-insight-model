@@ -27,7 +27,7 @@ tabs = st.tabs(["📁 Historical Data", "⚙️ Assumptions", "📊 Summary"])
 
 # --- Tab 1: Historical Data ---
 with tabs[0]:
-    st.header(t("📁 Upload or Input Historical Financials","📁 Ingrese Data histórica"))
+    st.header(t("📁 Upload or Input Historical Financials", "📁 Ingrese Data histórica"))
 
     st.subheader(t("Income Statement","Estado de Resultados"))
     uploaded_is = st.file_uploader("Upload Income Statement (.xlsx, .csv)", key="is_upload")
