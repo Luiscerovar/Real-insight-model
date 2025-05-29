@@ -2,6 +2,23 @@
 import streamlit as st
 import pandas as pd
 
+language = st.radio("Choose Language / Elija idioma", ["English", "Español"])
+
+def t(en, es):
+    return en if language == "English" else es
+
+st.set_page_config(page_title="Real Insight Model", layout="wide")
+st.markdown("""
+    <style>
+    .block-container {
+        padding-top: 2rem;
+    }
+    .stDownloadButton {
+        margin-top: 1rem;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
 st.set_page_config(page_title="Real Insight Financial Model", layout="wide")
 
 st.title("📊 Real Insight Financial Model")
@@ -10,9 +27,9 @@ tabs = st.tabs(["📁 Historical Data", "⚙️ Assumptions", "📊 Summary"])
 
 # --- Tab 1: Historical Data ---
 with tabs[0]:
-    st.header("📁 Upload or Input Historical Financials (Years as Columns)")
+    st.header(t("📁 Upload or Input Historical Financials","📁 Ingrese Data histórica"))
 
-    st.subheader("Income Statement")
+    st.subheader(t("Income Statement","Estado de Resultados"))
     uploaded_is = st.file_uploader("Upload Income Statement (.xlsx, .csv)", key="is_upload")
     if uploaded_is:
         if uploaded_is.name.endswith(".csv"):
@@ -28,7 +45,7 @@ with tabs[0]:
 
     df_is = st.data_editor(df_is, num_rows="dynamic", key="income_statement")
 
-    st.subheader("Balance Sheet")
+    st.subheader(t("Balance Sheet","Balance General"))
     uploaded_bs = st.file_uploader("Upload Balance Sheet (.xlsx, .csv)", key="bs_upload")
     if uploaded_bs:
         if uploaded_bs.name.endswith(".csv"):
@@ -44,10 +61,42 @@ with tabs[0]:
                   "Accounts Payable", "Debt", "Equity"])
 
     df_bs = st.data_editor(df_bs, num_rows="dynamic", key="balance_sheet")
+    
+        st.subheader(t("📋 Input Historical Financials","📋 Ingrese Data Histórica"))
+
+    st.markdown("#### Income Statement History")
+    hist_is = st.data_editor(
+        pd.DataFrame({
+            "Metric": ["Revenue", "COGS", "Operating Expenses", "Interest", "Taxes", "Net Income"],
+            "2022": [0, 0, 0, 0, 0, 0],
+            "2023": [0, 0, 0, 0, 0, 0],
+        }).set_index("Metric"),
+        num_rows="dynamic",
+        use_container_width=True
+    )
+
+    st.markdown("#### Balance Sheet History")
+    hist_bs = st.data_editor(
+        pd.DataFrame({
+            "Metric": ["Cash", "Accounts Receivable", "Inventory", "Fixed Assets", "Accounts Payable", "Debt", "Equity"],
+            "2023": [0, 0, 0, 0, 0, 0, 0],
+        }).set_index("Metric"),
+        num_rows="dynamic",
+        use_container_width=True
+    )
+
+    st.markdown("#### Optional: Upload Excel Template")
+    uploaded_file = st.file_uploader("Upload your historicals Excel file", type=["xlsx"])
+    if uploaded_file:
+        uploaded_df = pd.read_excel(uploaded_file, sheet_name=None)
+        st.success("File uploaded! You can preview the sheets below.")
+        for sheet, data in uploaded_df.items():
+            st.markdown(f"**Sheet: {sheet}**")
+            st.dataframe(data)
 
 # --- Tab 2: Assumptions ---
 with tabs[1]:
-    st.header("⚙️ Assumptions for Projections")
+    st.header(t("⚙️ Assumptions for Projections","⚙️ Supuestos para proyectar"))
 
     col1, col2, col3 = st.columns(3)
 
@@ -68,7 +117,7 @@ with tabs[1]:
 
 # --- Tab 3: Summary ---
 with tabs[2]:
-    st.header("📊 Projected Financial Summary")
+    st.header(t("📊 Projected Financial Summary","📊 Resumen de Estados Financieros Proyectados"))
 
     try:
         last_year = max([int(y) for y in df_is.columns])
@@ -91,12 +140,12 @@ with tabs[2]:
 
             projected_is[year] = [rev, cogs, sga, ebit, tax, net]
 
-        st.subheader("📈 Projected Income Statement")
+        st.subheader(t("📈 Projected Income Statement","📈 Estado de Resultados Proyectado"))
         st.dataframe(projected_is.style.format("{:,.0f}"))
     except Exception as e:
         st.warning(f"Could not calculate projections: {e}")
      
-    st.subheader("📘 Projected Balance Sheet")
+    st.subheader(t("📘 Projected Balance Sheet","📘 Balance General Proyectado"))
 
     projected_bs = pd.DataFrame(index=[
         "Cash", "Accounts Receivable", "Inventory", "Fixed Assets",
@@ -124,7 +173,8 @@ with tabs[2]:
         fixed_assets = prev_fixed + capex - depreciation
         net_income = projected_is.loc["Net Income", year]
         equity = prev_equity + net_income  # simplified
-        cash = prev_cash + net_income - capex  # simplified
+        net_cf = projected_cf.loc["Net Change in Cash", year]
+        cash = prev_cash + net_cf
         debt = df_bs.loc["Debt"].iloc[-1]  # assumed constant
 
         projected_bs[year] = [
@@ -134,7 +184,7 @@ with tabs[2]:
 
     st.dataframe(projected_bs.style.format("{:,.0f}"))
 
-    st.subheader("💵 Projected Cash Flow Statement")
+    st.subheader(t("💵 Projected Cash Flow Statement","💵 Flujo de Caja Proyectado"))
 
     projected_cf = pd.DataFrame(index=[
         "Net Income",
@@ -188,4 +238,56 @@ with tabs[2]:
         ]
 
     st.dataframe(projected_cf.style.format("{:,.0f}"))
+
+    st.subheader(t("📊 Key Financial Charts","📊 Gráficos Financieros"))
+
+    st.markdown("### Revenue and Net Income Over Time")
+    st.line_chart(projected_is.loc[["Revenue", "Net Income"]].T)
+
+    st.markdown("### Cash Flow from Operations")
+    st.bar_chart(projected_cf.loc[["Cash Flow from Operations"]].T)
+
+    st.markdown("### Ending Cash Position")
+    st.line_chart(projected_bs.loc[["Cash"]].T)
+
+    st.markdown("### Debt and Equity Over Time")
+    st.line_chart(projected_bs.loc[["Debt", "Equity"]].T)
+
+    st.subheader("📥 Export Financials to Excel")
+
+    from io import BytesIO
+
+    output = BytesIO()
+    with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+        projected_is.to_excel(writer, sheet_name='Income Statement')
+        projected_bs.to_excel(writer, sheet_name='Balance Sheet')
+        projected_cf.to_excel(writer, sheet_name='Cash Flow')
+
+    st.download_button(
+        label="Download Excel File",
+        data=output.getvalue(),
+        file_name="financial_projections.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+
+    st.subheader("💰 Valuation (Discounted Cash Flow)")
+
+    discount_rate = st.number_input("Discount Rate (%)", value=10.0) / 100
+    terminal_growth = st.number_input("Terminal Growth Rate (%)", value=2.0) / 100
+
+    cash_flows = projected_cf.loc["Cash Flow from Operations"]
+    years = cash_flows.index.tolist()
+    npv = 0
+
+    for i, year in enumerate(years):
+        npv += cash_flows[year] / ((1 + discount_rate) ** (i + 1))
+
+    terminal_value = (cash_flows[years[-1]] * (1 + terminal_growth)) / (discount_rate - terminal_growth)
+    terminal_value_pv = terminal_value / ((1 + discount_rate) ** len(years))
+
+    total_value = npv + terminal_value_pv
+
+    st.markdown(f"**NPV of Cash Flows:** ${npv:,.0f}")
+    st.markdown(f"**Terminal Value (present value):** ${terminal_value_pv:,.0f}")
+    st.markdown(f"**Estimated Business Value:** ${total_value:,.0f}")
     
