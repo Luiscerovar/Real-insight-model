@@ -115,6 +115,9 @@ with tabs[1]:
     st.header(t("⚙️ Assumptions for Projections", "⚙️ Supuestos para proyectar"))
     col1, col2, col3 = st.columns(3)
 
+    st.subheader("Projection Periods")
+    st.write(periods)
+
     with col1:
         revenue_growth = st.number_input("Revenue Growth (%)", value=10.0)
         cogs_pct = st.number_input("COGS (% of Revenue)", value=40.0)
@@ -134,6 +137,8 @@ with tabs[1]:
 with tabs[2]:
     st.header(t("📊 Projected Financial Summary", "📊 Resumen de Estados Financieros Proyectados"))
 
+    st.subheader("Projection Periods")
+    st.write(periods)
     try:
         import datetime
 
