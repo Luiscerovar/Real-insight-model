@@ -139,18 +139,24 @@ with tabs[2]:
 
     st.subheader("Projection Periods")
     st.write(periods)
+
     try:
         import datetime
 
-        if freq == "Yearly":
-            start_year = max([int(y) for y in df_is.columns])
-            projection_periods = [str(start_year + i) for i in range(1, num_periods + 1)]
+        # Use 'projection_type' selected at the top, and 'projection_duration' as well for consistency
+        if projection_type == "Yearly":
+            # Columns in df_is are strings representing years, convert to int for max
+            start_year = max(int(y) for y in df_is.columns if y.isdigit())
+            projection_years = [str(start_year + i) for i in range(1, projection_duration + 1)]
         else:
-            start = datetime.date(max([int(y) for y in df_is.columns]), 1, 1)
-            projection_periods = [(start + datetime.timedelta(days=30 * i)).strftime("%b %Y") for i in range(1, num_periods + 1)]
+            # For monthly, parse last date from df_is columns if possible
+            start_date = pd.to_datetime("today")
+            projection_years = [(start_date + pd.DateOffset(months=i)).strftime("%b-%Y") for i in range(1, projection_duration + 1)]
 
+        # Prepare projection DataFrame
         projected_is = pd.DataFrame(index=["Revenue", "COGS", "Operating Expenses", "EBIT", "Tax", "Net Income"])
 
+        # Calculate projected income statement
         for i, year in enumerate(projection_years):
             prev_rev = df_is.loc["Revenue"].iloc[-1] if i == 0 else projected_is.loc["Revenue"].iloc[i - 1]
             rev = prev_rev * (1 + revenue_growth / 100)
@@ -164,7 +170,7 @@ with tabs[2]:
         st.subheader(t("📈 Projected Income Statement", "📈 Estado de Resultados Proyectado"))
         st.dataframe(projected_is.style.format("{:,.0f}"))
 
-        # Cash Flow
+        # Cash Flow & Balance Sheet projections
         projected_cf = pd.DataFrame(index=[
             "Net Income", "Depreciation", "Change in AR", "Change in Inventory", "Change in AP",
             "CapEx", "Cash Flow from Operations", "Cash Flow from Investing", "Net Change in Cash"
@@ -216,6 +222,7 @@ with tabs[2]:
         st.subheader(t("💵 Projected Cash Flow Statement", "💵 Flujo de Caja Proyectado"))
         st.dataframe(projected_cf.style.format("{:,.0f}"))
 
+        # Charts
         st.subheader(t("📊 Key Financial Charts", "📊 Gráficos Financieros"))
         st.markdown("### Revenue and Net Income Over Time")
         st.line_chart(projected_is.loc[["Revenue", "Net Income"]].T)
@@ -229,14 +236,13 @@ with tabs[2]:
         st.markdown("### Debt and Equity Over Time")
         st.line_chart(projected_bs.loc[["Debt", "Equity"]].T)
 
-        # Download
+        # Download Excel
         st.subheader("📥 Export Financials to Excel")
         output = BytesIO()
         with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
             projected_is.to_excel(writer, sheet_name='Income Statement')
             projected_bs.to_excel(writer, sheet_name='Balance Sheet')
             projected_cf.to_excel(writer, sheet_name='Cash Flow')
-
         st.download_button(
             label="Download Excel File",
             data=output.getvalue(),
@@ -244,7 +250,7 @@ with tabs[2]:
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
 
-        # Valuation
+        # Valuation (DCF)
         st.subheader("💰 Valuation (Discounted Cash Flow)")
         discount_rate = st.number_input("Discount Rate (%)", value=10.0) / 100
         terminal_growth = st.number_input("Terminal Growth Rate (%)", value=2.0) / 100
@@ -261,4 +267,3 @@ with tabs[2]:
 
     except Exception as e:
         st.warning(f"Could not calculate projections: {e}")
-    
