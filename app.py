@@ -3,170 +3,105 @@ import streamlit as st
 import pandas as pd
 from io import BytesIO
 
-# --- Page Config ---
-st.set_page_config(page_title="Real Insight Model", layout="wide")
+st.set_page_config(page_title="Financial Model", layout="wide")
 
-# --- Language Toggle ---
-language = st.radio("Choose Language / Elija idioma", ["English", "Español"])
-def t(en, es): return en if language == "English" else es
+st.title("📊 Financial Projection Tool")
 
-# --- App Title ---
-st.title("📊 Real Insight Financial Model")
-
-# --- Projection Config ---
 projection_type = st.selectbox("Projection Type", ["Yearly", "Monthly"])
+
 if projection_type == "Yearly":
     projection_duration = st.slider("Projection Duration (Years)", 1, 10, 3)
-    periods = [str(pd.to_datetime("today").year + i) for i in range(1, projection_duration + 1)]
+    periods = [str(pd.to_datetime("today").year + i) for i in range(projection_duration)]
 else:
     projection_duration = st.slider("Projection Duration (Months)", 1, 60, 12)
     start_date = pd.to_datetime("today")
-    periods = [(start_date + pd.DateOffset(months=i)).strftime("%b-%Y") for i in range(1, projection_duration + 1)]
+    periods = [(start_date + pd.DateOffset(months=i)).strftime("%b-%Y") for i in range(projection_duration)]
 
-st.write(f"Projecting {projection_duration} {projection_type.lower()} period(s):")
+st.write(f"Projection Periods: {', '.join(periods)}")
 
-# --- Tabs ---
-tabs = st.tabs(["📁 Historical Data", "⚙️ Assumptions", "📊 Summary"])
+optimism_factor = st.number_input("Optimism Factor (%)", value=20.0)
+pessimism_factor = st.number_input("Pessimism Factor (%)", value=-20.0)
 
-# --- Tab 1: Historical Data ---
-with tabs[0]:
-    st.subheader(t("Income Statement", "Estado de Resultados"))
-    uploaded_is = st.file_uploader("Upload Income Statement (.xlsx, .csv)", key="is_upload")
-    if uploaded_is:
-        df_is = pd.read_csv(uploaded_is, index_col=0) if uploaded_is.name.endswith(".csv") else pd.read_excel(uploaded_is, index_col=0)
-    else:
-        df_is = pd.DataFrame({
-            "2022": [100000, 40000, 30000, 20000],
-            "2023": [120000, 48000, 33000, 26000],
-            "2024": [140000, 56000, 36000, 30000]
-        }, index=["Revenue", "COGS", "Operating Expenses", "Net Income"])
-    df_is = st.data_editor(df_is, num_rows="dynamic", key="income_statement")
+# Input for assumptions
+st.header("📌 Key Assumptions per Period")
+assumption_types = ["Revenue Growth (%)", "COGS (% of Revenue)", "Opex (% of Revenue)", "Tax Rate (%)"]
 
-    st.subheader(t("Balance Sheet", "Balance General"))
-    uploaded_bs = st.file_uploader("Upload Balance Sheet (.xlsx, .csv)", key="bs_upload")
-    if uploaded_bs:
-        df_bs = pd.read_csv(uploaded_bs, index_col=0) if uploaded_bs.name.endswith(".csv") else pd.read_excel(uploaded_bs, index_col=0)
-    else:
-        df_bs = pd.DataFrame({
-            "2022": [10000, 15000, 10000, 50000, 12000, 20000, 53000],
-            "2023": [12000, 17000, 11000, 52000, 13000, 18000, 61000],
-            "2024": [15000, 20000, 12000, 54000, 14000, 16000, 71000]
-        }, index=["Cash", "Accounts Receivable", "Inventory", "Fixed Assets", "Accounts Payable", "Debt", "Equity"])
-    df_bs = st.data_editor(df_bs, num_rows="dynamic", key="balance_sheet")
+assumptions_base = {}
 
-# --- Tab 2: Assumptions ---
-with tabs[1]:
-    st.header(t("⚙️ Assumptions for Projections", "⚙️ Supuestos para proyectar"))
-    st.subheader("📈 Key Assumptions Per Year with Scenarios")
+for assumption in assumption_types:
+    st.subheader(assumption)
+    default_value = st.number_input(f"{assumption} - Year 1", value=10.0 if 'Growth' in assumption else 25.0)
+    values = [default_value] * projection_duration
+    values = st.data_editor(pd.DataFrame({assumption: values}, index=periods), use_container_width=True)
+    assumptions_base[assumption] = values[assumption].tolist()
 
-    st.write("Projection Periods:", periods)
-
-    scenario_delta = st.number_input("Scenario Adjustment % (for Optimistic/Worst Cases)", value=5.0)
-
+# Prepare scenarios
+scenarios = {}
+for label, factor in zip(["Base", "Optimistic", "Worst"], [0, optimism_factor / 100, pessimism_factor / 100]):
     assumptions = {}
+    for assumption in assumption_types:
+        base = assumptions_base[assumption]
+        adjusted = [(1 + factor) * x for x in base]
+        assumptions[assumption] = adjusted
+    scenarios[label] = assumptions
 
-    st.markdown("#### Revenue Growth (%)")
-    base_revenue_growth = []
+st.header("📈 Projected Income Statements")
+
+projection_results = {}
+
+for label, assumption in scenarios.items():
+    income_statement = pd.DataFrame(index=["Revenue", "COGS", "Opex", "EBIT", "Tax", "Net Income"])
+    prev_revenue = 100000
     for i, period in enumerate(periods):
-        if i == 0:
-            value = st.number_input(f"Base Case - {period}", value=10.0, key=f"rev_base_{i}")
-        else:
-            value = st.number_input(f"Base Case - {period}", value=base_revenue_growth[0], key=f"rev_base_{i}")
-        base_revenue_growth.append(value)
+        growth = assumption["Revenue Growth (%)"][i] / 100
+        cogs_pct = assumption["COGS (% of Revenue)"][i] / 100
+        opex_pct = assumption["Opex (% of Revenue)"][i] / 100
+        tax_pct = assumption["Tax Rate (%)"][i] / 100
 
-    # Calculate optimistic and worst case
-    optimistic_revenue_growth = [v * (1 + scenario_delta / 100) for v in base_revenue_growth]
-    worst_revenue_growth = [v * (1 - scenario_delta / 100) for v in base_revenue_growth]
+        revenue = prev_revenue * (1 + growth)
+        cogs = revenue * cogs_pct
+        opex = revenue * opex_pct
+        ebit = revenue - cogs - opex
+        tax = ebit * tax_pct
+        net_income = ebit - tax
 
-    assumptions["Revenue Growth"] = {
-        "Base": base_revenue_growth,
-        "Optimistic": optimistic_revenue_growth,
-        "Worst": worst_revenue_growth
-    }
+        income_statement[period] = [revenue, cogs, opex, ebit, tax, net_income]
+        prev_revenue = revenue
 
-    st.markdown("#### COGS (% of Revenue)")
-    base_cogs_pct = []
-    for i, period in enumerate(periods):
-        if i == 0:
-            value = st.number_input(f"Base Case - {period}", value=40.0, key=f"cogs_base_{i}")
-        else:
-            value = st.number_input(f"Base Case - {period}", value=base_cogs_pct[0], key=f"cogs_base_{i}")
-        base_cogs_pct.append(value)
+    projection_results[label] = income_statement
+    st.subheader(f"Scenario: {label}")
+    st.dataframe(income_statement.style.format("{:,.0f}"))
 
-    optimistic_cogs_pct = [v * (1 - scenario_delta / 100) for v in base_cogs_pct]  # Lower COGS is better
-    worst_cogs_pct = [v * (1 + scenario_delta / 100) for v in base_cogs_pct]
+    # Charts
+    st.line_chart(income_statement.loc[["Revenue", "Net Income"]].T)
 
-    assumptions["COGS %"] = {
-        "Base": base_cogs_pct,
-        "Optimistic": optimistic_cogs_pct,
-        "Worst": worst_cogs_pct
-    }
+# Export to Excel
+st.header("📤 Export to Excel")
+output = BytesIO()
+with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
+    for label, df in projection_results.items():
+        df.to_excel(writer, sheet_name=f"{label} IS")
 
-    st.markdown("#### SG&A (% of Revenue)")
-    base_sgna_pct = []
-    for i, period in enumerate(periods):
-        if i == 0:
-            value = st.number_input(f"Base Case - {period}", value=25.0, key=f"sgna_base_{i}")
-        else:
-            value = st.number_input(f"Base Case - {period}", value=base_sgna_pct[0], key=f"sgna_base_{i}")
-        base_sgna_pct.append(value)
+st.download_button(
+    label="Download Excel File",
+    data=output.getvalue(),
+    file_name="financial_projections.xlsx",
+    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+)
 
-    optimistic_sgna_pct = [v * (1 - scenario_delta / 100) for v in base_sgna_pct]  # Lower SG&A is better
-    worst_sgna_pct = [v * (1 + scenario_delta / 100) for v in base_sgna_pct]
+# Simple DCF
+st.header("💰 Valuation (Discounted Cash Flow)")
+discount_rate = st.number_input("Discount Rate (%)", value=10.0) / 100
+terminal_growth = st.number_input("Terminal Growth Rate (%)", value=2.0) / 100
 
-    assumptions["SG&A %"] = {
-        "Base": base_sgna_pct,
-        "Optimistic": optimistic_sgna_pct,
-        "Worst": worst_sgna_pct
-    }
+selected_scenario = st.selectbox("Select Scenario for Valuation", list(projection_results.keys()))
+cash_flows = projection_results[selected_scenario].loc["Net Income"]
 
-    # Store in session state to use in projection logic
-    st.session_state["assumptions"] = assumptions
+npv = sum(cf / ((1 + discount_rate) ** (i + 1)) for i, cf in enumerate(cash_flows))
+terminal_value = (cash_flows.iloc[-1] * (1 + terminal_growth)) / (discount_rate - terminal_growth)
+terminal_pv = terminal_value / ((1 + discount_rate) ** len(cash_flows))
+enterprise_value = npv + terminal_pv
 
-# --- Tab 3: Summary ---
-with tabs[2]:
-    st.header(t("📊 Projected Financial Summary", "📊 Resumen de Estados Financieros Proyectados"))
-
-    scenarios = {"Base": base_growth, "Optimistic": [x * (1 + optimism_factor / 100) for x in base_growth], "Worst": [x * (1 + pessimism_factor / 100) for x in base_growth]}
-
-    for scenario_name, growth_list in scenarios.items():
-        st.subheader(f"📈 {scenario_name} Case Projections")
-        projected_is = pd.DataFrame(index=["Revenue", "COGS", "Operating Expenses", "EBIT", "Tax", "Net Income"])
-
-        for i, period in enumerate(periods):
-            prev_rev = df_is.loc["Revenue"].iloc[-1] if i == 0 else projected_is.loc["Revenue"].iloc[i - 1]
-            rev = prev_rev * (1 + growth_list[i] / 100)
-            cogs = rev * cogs_pct / 100
-            sga = rev * sgna_pct / 100
-            ebit = rev - cogs - sga
-            tax = ebit * tax_rate / 100
-            net = ebit - tax
-            projected_is[period] = [rev, cogs, sga, ebit, tax, net]
-
-        st.dataframe(projected_is.style.format("{:,.0f}"))
-
-        st.line_chart(projected_is.loc[["Revenue", "Net Income"]].T, use_container_width=True)
-
-        # Optional: include DCF valuation for Base Case only
-        if scenario_name == "Base":
-            st.subheader("💰 Valuation (Discounted Cash Flow)")
-            discount_rate = st.number_input("Discount Rate (%)", value=10.0) / 100
-            terminal_growth = st.number_input("Terminal Growth Rate (%)", value=2.0) / 100
-            cash_flows = projected_is.loc["Net Income"]
-            npv = sum(cash_flows[period] / ((1 + discount_rate) ** (i + 1)) for i, period in enumerate(periods))
-            terminal_value = (cash_flows[periods[-1]] * (1 + terminal_growth)) / (discount_rate - terminal_growth)
-            terminal_value_pv = terminal_value / ((1 + discount_rate) ** len(periods))
-            total_value = npv + terminal_value_pv
-            st.markdown(f"**NPV of Cash Flows:** ${npv:,.0f}")
-            st.markdown(f"**Terminal Value (present value):** ${terminal_value_pv:,.0f}")
-            st.markdown(f"**Estimated Business Value:** ${total_value:,.0f}")
-
-            output = BytesIO()
-            with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-                projected_is.to_excel(writer, sheet_name='Income Statement')
-            st.download_button(
-                label="📥 Download Excel File",
-                data=output.getvalue(),
-                file_name="financial_projections.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            )
+st.markdown(f"**NPV of Cash Flows:** ${npv:,.0f}")
+st.markdown(f"**Terminal Value (present value):** ${terminal_pv:,.0f}")
+st.markdown(f"**Estimated Business Value:** ${enterprise_value:,.0f}")
