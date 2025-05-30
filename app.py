@@ -57,24 +57,71 @@ with tabs[0]:
 # --- Tab 2: Assumptions ---
 with tabs[1]:
     st.header(t("⚙️ Assumptions for Projections", "⚙️ Supuestos para proyectar"))
-    st.markdown("### Revenue Growth Assumptions")
+    st.subheader("📈 Key Assumptions Per Year with Scenarios")
 
-    base_growth = []
+    st.write("Projection Periods:", periods)
+
+    scenario_delta = st.number_input("Scenario Adjustment % (for Optimistic/Worst Cases)", value=5.0)
+
+    assumptions = {}
+
+    st.markdown("#### Revenue Growth (%)")
+    base_revenue_growth = []
     for i, period in enumerate(periods):
-        base_growth.append(st.number_input(f"Base Case Revenue Growth (%) - {period}", key=f"base_{i}", value=10.0))
+        if i == 0:
+            value = st.number_input(f"Base Case - {period}", value=10.0, key=f"rev_base_{i}")
+        else:
+            value = st.number_input(f"Base Case - {period}", value=base_revenue_growth[0], key=f"rev_base_{i}")
+        base_revenue_growth.append(value)
 
-    optimism_factor = st.slider("Optimistic Case Adjustment (%)", -50.0, 100.0, 5.0)
-    pessimism_factor = st.slider("Worst Case Adjustment (%)", -50.0, 100.0, -5.0)
+    # Calculate optimistic and worst case
+    optimistic_revenue_growth = [v * (1 + scenario_delta / 100) for v in base_revenue_growth]
+    worst_revenue_growth = [v * (1 - scenario_delta / 100) for v in base_revenue_growth]
 
-    st.markdown("### Cost and Operational Assumptions")
-    cogs_pct = st.number_input("COGS (% of Revenue)", value=40.0)
-    sgna_pct = st.number_input("Operating Expenses (% of Revenue)", value=25.0)
-    tax_rate = st.number_input("Tax Rate (%)", value=25.0)
-    capex_pct = st.number_input("CapEx (% of Revenue)", value=5.0)
-    depreciation_years = st.number_input("Useful Life for New Assets (years)", value=5)
-    ar_days = st.number_input("Accounts Receivable Days", value=45)
-    inventory_days = st.number_input("Inventory Days", value=60)
-    ap_days = st.number_input("Accounts Payable Days", value=30)
+    assumptions["Revenue Growth"] = {
+        "Base": base_revenue_growth,
+        "Optimistic": optimistic_revenue_growth,
+        "Worst": worst_revenue_growth
+    }
+
+    st.markdown("#### COGS (% of Revenue)")
+    base_cogs_pct = []
+    for i, period in enumerate(periods):
+        if i == 0:
+            value = st.number_input(f"Base Case - {period}", value=40.0, key=f"cogs_base_{i}")
+        else:
+            value = st.number_input(f"Base Case - {period}", value=base_cogs_pct[0], key=f"cogs_base_{i}")
+        base_cogs_pct.append(value)
+
+    optimistic_cogs_pct = [v * (1 - scenario_delta / 100) for v in base_cogs_pct]  # Lower COGS is better
+    worst_cogs_pct = [v * (1 + scenario_delta / 100) for v in base_cogs_pct]
+
+    assumptions["COGS %"] = {
+        "Base": base_cogs_pct,
+        "Optimistic": optimistic_cogs_pct,
+        "Worst": worst_cogs_pct
+    }
+
+    st.markdown("#### SG&A (% of Revenue)")
+    base_sgna_pct = []
+    for i, period in enumerate(periods):
+        if i == 0:
+            value = st.number_input(f"Base Case - {period}", value=25.0, key=f"sgna_base_{i}")
+        else:
+            value = st.number_input(f"Base Case - {period}", value=base_sgna_pct[0], key=f"sgna_base_{i}")
+        base_sgna_pct.append(value)
+
+    optimistic_sgna_pct = [v * (1 - scenario_delta / 100) for v in base_sgna_pct]  # Lower SG&A is better
+    worst_sgna_pct = [v * (1 + scenario_delta / 100) for v in base_sgna_pct]
+
+    assumptions["SG&A %"] = {
+        "Base": base_sgna_pct,
+        "Optimistic": optimistic_sgna_pct,
+        "Worst": worst_sgna_pct
+    }
+
+    # Store in session state to use in projection logic
+    st.session_state["assumptions"] = assumptions
 
 # --- Tab 3: Summary ---
 with tabs[2]:
