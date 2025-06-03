@@ -34,46 +34,83 @@ tabs = st.tabs([
 with tabs[0]:
     st.subheader("Historical Financial Data")
 
-    df = st.session_state["historical_data"].copy()
-
+    # Define input columns editable by the user (all base inputs + impuestos y participacion)
     input_cols = [
-        "Revenue", "COGS", "Admin Expenses", "Sales Expenses",
-        "Depreciation", "Amortization", "Interest Paid", "Interest Earned",
-        "Other Income", "Other Expenses", "Workers Participation", "Taxes"
+        "Ingresos", "Costo de Ventas", "Gastos Administración", "Gastos Ventas",
+        "Depreciación", "Amortización", "Otros Ingresos No Operativos", "Otros Gastos No Operativos",
+        "Resultado Financiero Neto", "Participación de Trabajadores", "Impuestos"
     ]
 
-    # Ensure all required columns are present
-    for col in input_cols:
-        if col not in df.columns:
-            df[col] = 0.0  # Or use None if preferred
+    # Initialize session_state with default columns if missing
+    if "historical_data" not in st.session_state or st.session_state["historical_data"].empty:
+        current_year = datetime.now().year
+        st.session_state["historical_data"] = pd.DataFrame({
+            "Year": [current_year - i for i in reversed(range(3))],
+            "Ingresos": [100000, 120000, 140000],
+            "Costo de Ventas": [40000, 48000, 56000],
+            "Gastos Administración": [15000, 16000, 17000],
+            "Gastos Ventas": [15000, 16000, 17000],
+            "Depreciación": [5000, 6000, 7000],
+            "Amortización": [2000, 2500, 3000],
+            "Otros Ingresos No Operativos": [1000, 1100, 1200],
+            "Otros Gastos No Operativos": [500, 600, 700],
+            "Resultado Financiero Neto": [1000, 1200, 1500],
+            "Participación de Trabajadores": [2000, 2200, 2500],
+            "Impuestos": [5000, 5500, 6000]
+        })
 
-    if "Year" not in df.columns:
-        df["Year"] = range(1, len(df) + 1)
-
-    df_inputs = df[["Year"] + input_cols].copy()
-
-    edited = st.data_editor(df_inputs.set_index("Year").T, num_rows="dynamic")
-    df_inputs = edited.T.reset_index().rename(columns={"index": "Year"})
-
-    # Calculated metrics
-    df_inputs["Utilidad Bruta"] = df_inputs["Revenue"] - df_inputs["COGS"]
-    df_inputs["EBITDA"] = df_inputs["Utilidad Bruta"] - df_inputs["Admin Expenses"] - df_inputs["Sales Expenses"]
-    df_inputs["EBIT"] = df_inputs["EBITDA"] - df_inputs["Depreciation"] - df_inputs["Amortization"]
-    df_inputs["EBT (Pre Workers)"] = (
-        df_inputs["EBIT"]
-        - df_inputs["Interest Paid"]
-        + df_inputs["Interest Earned"]
-        + df_inputs["Other Income"]
-        - df_inputs["Other Expenses"]
-    )
-    df_inputs["Net Income"] = (
-        df_inputs["EBT (Pre Workers)"] - df_inputs["Workers Participation"] - df_inputs["Taxes"]
+    # Show editable inputs in a data editor
+    df_inputs = st.data_editor(
+        st.session_state["historical_data"][["Year"] + input_cols].set_index("Year"),
+        num_rows="dynamic",
+        use_container_width=True
     )
 
-    # Update state
-    st.session_state["historical_data"] = df_inputs
+    # Update session state with user edits
+    st.session_state["historical_data"].update(df_inputs.reset_index())
 
-    st.dataframe(df_inputs.set_index("Year").T)
+    # Extract columns for calculation
+    ingresos = st.session_state["historical_data"]["Ingresos"]
+    costo_ventas = st.session_state["historical_data"]["Costo de Ventas"]
+    gastos_admin = st.session_state["historical_data"]["Gastos Administración"]
+    gastos_ventas = st.session_state["historical_data"]["Gastos Ventas"]
+    depreciacion = st.session_state["historical_data"]["Depreciación"]
+    amortizacion = st.session_state["historical_data"]["Amortización"]
+    otros_ingresos = st.session_state["historical_data"]["Otros Ingresos No Operativos"]
+    otros_gastos = st.session_state["historical_data"]["Otros Gastos No Operativos"]
+    resultado_financiero = st.session_state["historical_data"]["Resultado Financiero Neto"]
+    participacion_trabajadores = st.session_state["historical_data"]["Participación de Trabajadores"]
+    impuestos = st.session_state["historical_data"]["Impuestos"]
+
+    # Calculate required metrics
+    utilidad_bruta = ingresos - costo_ventas
+    ebitda = utilidad_bruta - gastos_admin - gastos_ventas
+    ebit = ebitda - depreciacion - amortizacion
+    ebt = ebit + otros_ingresos - otros_gastos + resultado_financiero
+    utilidad_neta = ebt - participacion_trabajadores - impuestos
+
+    # Create income statement DataFrame for display (transpose for readability)
+    income_statement = pd.DataFrame({
+        "Ingresos": ingresos,
+        "Costo de Ventas": costo_ventas,
+        "UTILIDAD BRUTA": utilidad_bruta,
+        "Gastos Administración": gastos_admin,
+        "Gastos Ventas": gastos_ventas,
+        "UTILIDAD ANTES DE DEP Y AMORT (EBITDA)": ebitda,
+        "Depreciación": depreciacion,
+        "Amortización": amortizacion,
+        "UTILIDAD OPERATIVA (EBIT)": ebit,
+        "Otros Ingresos No Operativos": otros_ingresos,
+        "Otros Gastos No Operativos": otros_gastos,
+        "Resultado Financiero Neto": resultado_financiero,
+        "UTILIDAD ANTES DE IMPUESTOS Y PARTICIPACIÓN TRABAJADORES (EBT)": ebt,
+        "Participación de Trabajadores": participacion_trabajadores,
+        "Impuestos": impuestos,
+        "UTILIDAD NETA": utilidad_neta
+    }, index=st.session_state["historical_data"]["Year"]).T
+
+    st.markdown("### Income Statement (Calculated Fields & Inputs)")
+    st.dataframe(income_statement)
 
 # --- Tab 2: Assumptions ---
 with tabs[1]:
