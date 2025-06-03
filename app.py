@@ -32,10 +32,44 @@ tabs = st.tabs([
 
 # --- Tab 1: Historical Data ---
 with tabs[0]:
+    # --- Tab 1: Historical Data ---
+with tabs[0]:
     st.subheader("Historical Financial Data")
-    # Transpose for years as columns
-    edited = st.data_editor(st.session_state["historical_data"].set_index("Year").T)
-    st.session_state["historical_data"] = edited.T.reset_index().rename(columns={"index": "Year"})
+
+    # Get a copy to work on
+    df = st.session_state["historical_data"].copy()
+
+    # Editable base inputs
+    input_cols = [
+        "Revenue", "COGS", "Admin Expenses", "Sales Expenses",
+        "Depreciation", "Amortization", "Interest Paid", "Interest Earned",
+        "Other Income", "Other Expenses", "Workers Participation", "Taxes"
+    ]
+
+    df_inputs = df[["Year"] + input_cols].copy()
+    edited = st.data_editor(df_inputs.set_index("Year").T, num_rows="dynamic")
+    df_inputs = edited.T.reset_index().rename(columns={"index": "Year"})
+
+    # Calculate required metrics
+    df_inputs["Utilidad Bruta"] = df_inputs["Revenue"] - df_inputs["COGS"]
+    df_inputs["EBITDA"] = df_inputs["Utilidad Bruta"] - df_inputs["Admin Expenses"] - df_inputs["Sales Expenses"]
+    df_inputs["EBIT"] = df_inputs["EBITDA"] - df_inputs["Depreciation"] - df_inputs["Amortization"]
+    df_inputs["EBT (Pre Workers)"] = (
+        df_inputs["EBIT"]
+        - df_inputs["Interest Paid"]
+        + df_inputs["Interest Earned"]
+        + df_inputs["Other Income"]
+        - df_inputs["Other Expenses"]
+    )
+    df_inputs["Net Income"] = (
+        df_inputs["EBT (Pre Workers)"] - df_inputs["Workers Participation"] - df_inputs["Taxes"]
+    )
+
+    # Update session state
+    st.session_state["historical_data"] = df_inputs
+
+    # Display full historical statement
+    st.dataframe(df_inputs.set_index("Year").T)
 
 # --- Tab 2: Assumptions ---
 with tabs[1]:
@@ -178,7 +212,13 @@ with tabs[4]:
         taxes = [taxable_income[i] * tax_rate[i] / 100 for i in range(len(revenue))]
         net_income = [taxable_income[i] - taxes[i] for i in range(len(revenue))]
 
+        fcf = [net_income[i] + depreciation[i] + amortization[i]  # Non-cash addbacks
+               - (revenue[i] * assumptions["CapEx (% of Revenue)"][scenario][i] / 100)  # CapEx
+               - (revenue[i] * assumptions["Working Capital (% of Revenue)"][scenario][i] / 100)  # WC changes
+               for i in range(len(revenue))]
+
         return pd.DataFrame({
+            "Year": [datetime.now().year + i for i in range(len(revenue))],
             "Revenue": revenue,
             "COGS": cogs,
             "Admin Expenses": admin_exp,
@@ -196,7 +236,8 @@ with tabs[4]:
             "Taxable Income": taxable_income,
             "Taxes": taxes,
             "Net Income": net_income,
-         })
+            "FCF": fcf
+})
 
     for scenario in scenarios:
         revenue = [st.session_state["historical_data"].iloc[-1]["Revenue"]]
