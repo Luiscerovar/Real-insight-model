@@ -28,22 +28,19 @@ pages = st.tabs(["Historical Data", "Assumptions", "Projections", "Charts", "Val
 
 # --- Tab 1: Historical Data ---
 with pages[0]:
-    st.subheader("Historical Financial Data (Years as Columns)")
+    st.subheader("Historical Financial Data")
+    # Transpose for years as columns
+    edited = st.data_editor(st.session_state["historical_data"].set_index("Year").T)
+    st.session_state["historical_data"] = edited.T.reset_index().rename(columns={"index": "Year"})
 
-    # Original editable format (years in rows)
-    df_edit = st.session_state["historical_data"]
-    edited_df = st.data_editor(df_edit, num_rows="dynamic")
-    st.session_state["historical_data"] = edited_df
-
-    # Transpose for display
-    df_transposed = edited_df.set_index("Year").T
-    st.markdown("#### Transposed View (Read-only)")
-    st.dataframe(df_transposed)
 # --- Tab 2: Assumptions ---
 with pages[1]:
     st.subheader("Key Assumptions (Yearly, Scenario-Based)")
     scenarios = ["Base", "Optimistic", "Worst"]
-    assumption_names = ["Revenue Growth (%)", "COGS (% of Revenue)", "OPEX (% of Revenue)", "Tax Rate (%)", "Depreciation (% of Revenue)", "CapEx (% of Revenue)", "Working Capital (% of Revenue)"]
+    assumption_names = [
+        "Revenue Growth (%)", "COGS (% of Revenue)", "OPEX (% of Revenue)",
+        "Tax Rate (%)", "Depreciation (% of Revenue)", "CapEx (% of Revenue)", "Working Capital (% of Revenue)"
+    ]
     assumptions = {}
 
     for name in assumption_names:
@@ -86,7 +83,7 @@ with pages[2]:
         liabilities = np.cumsum([working_capital[i] * 0.5 for i in range(st.session_state["years"])])
         equity = np.cumsum(net_income)
 
-        projection_data[scenario] = pd.DataFrame({
+        df = pd.DataFrame({
             "Year": [datetime.now().year + i for i in range(1, st.session_state["years"] + 1)],
             "Revenue": revenue,
             "COGS": cogs,
@@ -98,8 +95,10 @@ with pages[2]:
             "Liabilities": liabilities,
             "Equity": equity
         })
+
+        projection_data[scenario] = df
         st.write(f"### {scenario} Scenario")
-        st.dataframe(projection_data[scenario])
+        st.dataframe(df.set_index("Year").T)
 
 # --- Tab 4: Charts ---
 with pages[3]:
