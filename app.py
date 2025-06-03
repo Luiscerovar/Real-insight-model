@@ -28,9 +28,17 @@ pages = st.tabs(["Historical Data", "Assumptions", "Projections", "Charts", "Val
 
 # --- Tab 1: Historical Data ---
 with pages[0]:
-    st.subheader("Historical Financial Data")
-    st.session_state["historical_data"] = st.data_editor(st.session_state["historical_data"], num_rows="dynamic")
+    st.subheader("Historical Financial Data (Years as Columns)")
 
+    # Original editable format (years in rows)
+    df_edit = st.session_state["historical_data"]
+    edited_df = st.data_editor(df_edit, num_rows="dynamic")
+    st.session_state["historical_data"] = edited_df
+
+    # Transpose for display
+    df_transposed = edited_df.set_index("Year").T
+    st.markdown("#### Transposed View (Read-only)")
+    st.dataframe(df_transposed)
 # --- Tab 2: Assumptions ---
 with pages[1]:
     st.subheader("Key Assumptions (Yearly, Scenario-Based)")
