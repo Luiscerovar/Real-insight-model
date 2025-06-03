@@ -132,10 +132,56 @@ with tabs[3]:
 
 # Other tabs (Projections, Charts, Valuation) stay the same for now
 
+# Place this above or near your projections tab logic
+def generate_income_statement(revenue, assumptions, d_and_a, interest_paid, interest_earned, other_income, other_expense, scenario):
+    ...
+
 # --- Tab 5: Projections ---
 with tabs[4]:
     st.subheader("Projections")
     projection_data = {}
+
+    def generate_income_statement(revenue, assumptions, scenario):
+        cogs = [r * assumptions["COGS (% of Revenue)"][scenario][i] / 100 for i, r in enumerate(revenue)]
+        admin_exp = [r * assumptions.get("Admin Expenses (% of Revenue)", {"Base": [0]*len(revenue)})[scenario][i] / 100 for i, r in enumerate(revenue)]
+        sales_exp = [r * assumptions.get("Sales Expenses (% of Revenue)", {"Base": [0]*len(revenue)})[scenario][i] / 100 for i, r in enumerate(revenue)]
+        other_inc = [r * assumptions.get("Other Income (% of Revenue)", {"Base": [0]*len(revenue)})[scenario][i] / 100 for i, r in enumerate(revenue)]
+        other_exp = [r * assumptions.get("Other Expenses (% of Revenue)", {"Base": [0]*len(revenue)})[scenario][i] / 100 for i, r in enumerate(revenue)]
+        depreciation = [r * assumptions["Depreciation (% of Revenue)"][scenario][i] / 100 for i, r in enumerate(revenue)]
+        amortization = [0 for _ in revenue]  # Placeholder until full amortization logic is integrated
+        ebitda = [revenue[i] - cogs[i] - admin_exp[i] - sales_exp[i] for i in range(len(revenue))]
+        ebit = [ebitda[i] - depreciation[i] - amortization[i] for i in range(len(revenue))]
+
+        # Dummy values until debt and cash logic are wired in
+        interest_paid = [0] * len(revenue)
+        interest_earned = [0] * len(revenue)
+
+        ebt_pre_workers = [ebit[i] - interest_paid[i] + interest_earned[i] + other_inc[i] - other_exp[i] for i in range(len(revenue))]
+        workers_participation = [0.15 * e for e in ebt_pre_workers]
+        taxable_income = [ebt_pre_workers[i] - workers_participation[i] for i in range(len(revenue))]
+        tax_rate = assumptions["Tax Rate (%)"][scenario]
+        taxes = [taxable_income[i] * tax_rate[i] / 100 for i in range(len(revenue))]
+        net_income = [taxable_income[i] - taxes[i] for i in range(len(revenue))]
+
+        return pd.DataFrame({
+            "Revenue": revenue,
+            "COGS": cogs,
+            "Admin Expenses": admin_exp,
+            "Sales Expenses": sales_exp,
+            "EBITDA": ebitda,
+            "Depreciation": depreciation,
+            "Amortization": amortization,
+            "EBIT": ebit,
+            "Interest Paid": interest_paid,
+            "Interest Earned": interest_earned,
+            "Other Income": other_inc,
+            "Other Expenses": other_exp,
+            "EBT (Pre Workers)": ebt_pre_workers,
+            "Workers Participation": workers_participation,
+            "Taxable Income": taxable_income,
+            "Taxes": taxes,
+            "Net Income": net_income,
+         })
 
     for scenario in scenarios:
         revenue = [st.session_state["historical_data"].iloc[-1]["Revenue"]]
@@ -143,37 +189,12 @@ with tabs[4]:
             revenue.append(revenue[-1] * (1 + g / 100))
         revenue = revenue[1:]
 
-        cogs = [r * assumptions["COGS (% of Revenue)"][scenario][i] / 100 for i, r in enumerate(revenue)]
-        opex = [r * assumptions["OPEX (% of Revenue)"][scenario][i] / 100 for i, r in enumerate(revenue)]
-        depreciation = [r * assumptions["Depreciation (% of Revenue)"][scenario][i] / 100 for i, r in enumerate(revenue)]
-        capex = [r * assumptions["CapEx (% of Revenue)"][scenario][i] / 100 for i, r in enumerate(revenue)]
-        working_capital = [r * assumptions["Working Capital (% of Revenue)"][scenario][i] / 100 for i, r in enumerate(revenue)]
+        income_df = generate_income_statement(revenue, assumptions, scenario)
+        income_df["Year"] = [datetime.now().year + i for i in range(st.session_state["years"])]
 
-        ebit = [revenue[i] - cogs[i] - opex[i] - depreciation[i] for i in range(st.session_state["years"])]
-        tax = [ebit[i] * assumptions["Tax Rate (%)"][scenario][i] / 100 for i in range(st.session_state["years"])]
-        net_income = [ebit[i] - tax[i] for i in range(st.session_state["years"])]
-        fcf = [net_income[i] + depreciation[i] - capex[i] - working_capital[i] for i in range(st.session_state["years"])]
-
-        assets = np.cumsum([capex[i] for i in range(st.session_state["years"])])
-        liabilities = np.cumsum([working_capital[i] * 0.5 for i in range(st.session_state["years"])])
-        equity = np.cumsum(net_income)
-
-        df = pd.DataFrame({
-            "Year": [datetime.now().year + i for i in range(1, st.session_state["years"] + 1)],
-            "Revenue": revenue,
-            "COGS": cogs,
-            "OPEX": opex,
-            "EBIT": ebit,
-            "Net Income": net_income,
-            "FCF": fcf,
-            "Assets": assets,
-            "Liabilities": liabilities,
-            "Equity": equity
-        })
-
-        projection_data[scenario] = df
-        st.write(f"### {scenario} Scenario")
-        st.dataframe(df.set_index("Year").T)
+        projection_data[scenario] = income_df
+        st.write(f"### {scenario} Scenario - Income Statement")
+        st.dataframe(income_df.set_index("Year").T)
 
 # --- Tab 6: Charts ---
 with tabs[5]:
