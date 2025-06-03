@@ -34,21 +34,28 @@ tabs = st.tabs([
 with tabs[0]:
     st.subheader("Historical Financial Data")
 
-    # Get a copy to work on
     df = st.session_state["historical_data"].copy()
 
-    # Editable base inputs
     input_cols = [
         "Revenue", "COGS", "Admin Expenses", "Sales Expenses",
         "Depreciation", "Amortization", "Interest Paid", "Interest Earned",
         "Other Income", "Other Expenses", "Workers Participation", "Taxes"
     ]
 
+    # Ensure all required columns are present
+    for col in input_cols:
+        if col not in df.columns:
+            df[col] = 0.0  # Or use None if preferred
+
+    if "Year" not in df.columns:
+        df["Year"] = range(1, len(df) + 1)
+
     df_inputs = df[["Year"] + input_cols].copy()
+
     edited = st.data_editor(df_inputs.set_index("Year").T, num_rows="dynamic")
     df_inputs = edited.T.reset_index().rename(columns={"index": "Year"})
 
-    # Calculate required metrics
+    # Calculated metrics
     df_inputs["Utilidad Bruta"] = df_inputs["Revenue"] - df_inputs["COGS"]
     df_inputs["EBITDA"] = df_inputs["Utilidad Bruta"] - df_inputs["Admin Expenses"] - df_inputs["Sales Expenses"]
     df_inputs["EBIT"] = df_inputs["EBITDA"] - df_inputs["Depreciation"] - df_inputs["Amortization"]
@@ -63,10 +70,9 @@ with tabs[0]:
         df_inputs["EBT (Pre Workers)"] - df_inputs["Workers Participation"] - df_inputs["Taxes"]
     )
 
-    # Update session state
+    # Update state
     st.session_state["historical_data"] = df_inputs
 
-    # Display full historical statement
     st.dataframe(df_inputs.set_index("Year").T)
 
 # --- Tab 2: Assumptions ---
