@@ -32,8 +32,6 @@ tabs = st.tabs([
 
 # --- Tab 1: Historical Data ---
 with tabs[0]:
-    # --- Tab 1: Historical Data ---
-with tabs[0]:
     st.subheader("Historical Financial Data")
 
     # Get a copy to work on
