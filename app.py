@@ -31,14 +31,14 @@ tabs = st.tabs([
 ])
 
 # --- Tab 1: Historical Data ---
-with pages[0]:
+with tabs[0]:
     st.subheader("Historical Financial Data")
     # Transpose for years as columns
     edited = st.data_editor(st.session_state["historical_data"].set_index("Year").T)
     st.session_state["historical_data"] = edited.T.reset_index().rename(columns={"index": "Year"})
 
 # --- Tab 2: Assumptions ---
-with pages[1]:
+with tabs[1]:
     st.subheader("Key Assumptions (Yearly, Scenario-Based)")
     scenarios = ["Base", "Optimistic", "Worst"]
     assumption_names = [
@@ -63,7 +63,7 @@ with pages[1]:
 
 
 # --- Tab 3: Depreciation & Amortization ---
-with pages[2]:
+with tabs[2]:
     st.subheader("Depreciation & Amortization Inputs")
 
     if "da_inputs" not in st.session_state:
@@ -100,7 +100,7 @@ with pages[2]:
     )
 
 # --- Tab 4: Debt ---
-with pages[3]:
+with tabs[3]:
     st.subheader("Debt Structure")
 
     if "debt_inputs" not in st.session_state:
@@ -133,7 +133,7 @@ with pages[3]:
 # Other tabs (Projections, Charts, Valuation) stay the same for now
 
 # --- Tab 5: Projections ---
-with pages[4]:
+with tabs[4]:
     st.subheader("Projections")
     projection_data = {}
 
@@ -176,7 +176,7 @@ with pages[4]:
         st.dataframe(df.set_index("Year").T)
 
 # --- Tab 6: Charts ---
-with pages[5]:
+with tabs[5]:
     st.subheader("Charts")
     metric = st.selectbox("Select Metric", ["Revenue", "EBIT", "Net Income", "FCF"])
     chart_df = pd.DataFrame({
@@ -186,7 +186,7 @@ with pages[5]:
     st.line_chart(chart_df)
 
 # --- Tab 7: Valuation ---
-with pages[6]:
+with tabs[6]:
     st.subheader("Valuation (Discounted Cash Flow)")
     discount_rate = st.number_input("Discount Rate (%)", value=10.0, step=0.5)
     valuations = {}
