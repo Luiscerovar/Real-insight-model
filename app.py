@@ -1,64 +1,114 @@
-
 import streamlit as st
 import pandas as pd
-import numpy as np
-import io
 from datetime import datetime
 
 st.set_page_config(page_title="Financial Model", layout="wide")
 
-# Initialize session state
+# Session state init
 if "years" not in st.session_state:
     st.session_state["years"] = 5
 
-if "historical_data" not in st.session_state:
-    st.session_state["historical_data"] = pd.DataFrame({
-        "Year": [datetime.now().year - i for i in range(1, 4)][::-1],
-        "Revenue": [100000, 120000, 140000],
-        "COGS": [40000, 48000, 56000],
-        "OPEX": [30000, 32000, 34000]
-    })
-
-# Sidebar controls
+# Sidebar: Projection duration
 st.sidebar.header("Settings")
 st.session_state["years"] = st.sidebar.slider("Projection Duration (Years)", 1, 10, st.session_state["years"])
 
-# Tabs
-pages = st.tabs(["Historical Data", "Assumptions", "Projections", "Charts", "Valuation"])
+# Define tabs
+tabs = st.tabs([
+    "Historical Data", "Assumptions", "Depreciation & Amortization", "Debt",
+    "Projections", "Charts", "Valuation"
+])
 
-# --- Tab 1: Historical Data ---
-with pages[0]:
+# --- Historical Data ---
+with tabs[0]:
     st.subheader("Historical Financial Data")
-    # Transpose for years as columns
-    edited = st.data_editor(st.session_state["historical_data"].set_index("Year").T)
-    st.session_state["historical_data"] = edited.T.reset_index().rename(columns={"index": "Year"})
+    if "historical_data" not in st.session_state:
+        st.session_state["historical_data"] = pd.DataFrame({
+            "Year": [datetime.now().year - i for i in range(1, 4)][::-1],
+            "Revenue": [100000, 120000, 140000],
+            "COGS": [40000, 48000, 56000],
+            "OPEX": [30000, 32000, 34000]
+        })
+    st.session_state["historical_data"] = st.data_editor(
+        st.session_state["historical_data"], num_rows="dynamic"
+    )
 
-# --- Tab 2: Assumptions ---
-with pages[1]:
+# --- Assumptions ---
+with tabs[1]:
     st.subheader("Key Assumptions (Yearly, Scenario-Based)")
-    scenarios = ["Base", "Optimistic", "Worst"]
-    assumption_names = [
-        "Revenue Growth (%)", "COGS (% of Revenue)", "OPEX (% of Revenue)",
-        "Tax Rate (%)", "Depreciation (% of Revenue)", "CapEx (% of Revenue)", "Working Capital (% of Revenue)"
-    ]
-    assumptions = {}
+    # We'll add the minimum cash balance assumption here later
 
-    for name in assumption_names:
-        assumptions[name] = {}
-        with st.expander(name):
-            for scenario in scenarios:
-                same = st.checkbox(f"Same every year ({scenario})", value=True, key=f"same_{name}_{scenario}")
-                values = []
-                for year in range(1, st.session_state["years"] + 1):
-                    if year == 1 or not same:
-                        val = st.number_input(f"{scenario} - Year {year}", value=10.0, step=1.0, key=f"{name}_{scenario}_{year}")
-                    else:
-                        val = values[0]
-                    values.append(val)
-                assumptions[name][scenario] = values
+# --- Depreciation & Amortization Tab ---
+with tabs[2]:
+    st.subheader("Depreciation & Amortization Inputs")
+
+    if "da_inputs" not in st.session_state:
+        st.session_state["da_inputs"] = {
+            "Fixed Assets": pd.DataFrame({
+                "Category": ["Machinery", "Furniture"],
+                "Historical Cost": [50000, 20000],
+                "Useful Life (Years)": [5, 10]
+            }),
+            "Intangibles": pd.DataFrame({
+                "Category": ["Software"],
+                "Historical Cost": [10000],
+                "Useful Life (Years)": [5]
+            }),
+            "CapEx Forecast": pd.DataFrame({
+                "Year": [datetime.now().year + i for i in range(st.session_state["years"])],
+                "CapEx": [10000 for _ in range(st.session_state["years"])]
+            })
+        }
+
+    st.markdown("### Fixed Assets")
+    st.session_state["da_inputs"]["Fixed Assets"] = st.data_editor(
+        st.session_state["da_inputs"]["Fixed Assets"], num_rows="dynamic"
+    )
+
+    st.markdown("### Intangibles")
+    st.session_state["da_inputs"]["Intangibles"] = st.data_editor(
+        st.session_state["da_inputs"]["Intangibles"], num_rows="dynamic"
+    )
+
+    st.markdown("### CapEx Forecast")
+    st.session_state["da_inputs"]["CapEx Forecast"] = st.data_editor(
+        st.session_state["da_inputs"]["CapEx Forecast"], num_rows="dynamic"
+    )
+
+# --- Debt Tab ---
+with tabs[3]:
+    st.subheader("Debt Structure")
+
+    if "debt_inputs" not in st.session_state:
+        current_year = datetime.now().year
+        st.session_state["debt_inputs"] = {
+            "Existing Debt": pd.DataFrame({
+                "Type": ["Short-Term", "Long-Term"],
+                "Beginning Balance": [10000, 50000],
+                "Interest Rate (%)": [5.0, 6.0],
+                "Term (Years)": [1, 5]
+            }),
+            "New Debt Assumptions": pd.DataFrame({
+                "Year": [current_year + i for i in range(st.session_state["years"])],
+                "Amount": [0 for _ in range(st.session_state["years"])],
+                "Interest Rate (%)": [7.0 for _ in range(st.session_state["years"])],
+                "Term (Years)": [3 for _ in range(st.session_state["years"])]
+            })
+        }
+
+    st.markdown("### Existing Debt")
+    st.session_state["debt_inputs"]["Existing Debt"] = st.data_editor(
+        st.session_state["debt_inputs"]["Existing Debt"], num_rows="dynamic"
+    )
+
+    st.markdown("### New Debt Assumptions")
+    st.session_state["debt_inputs"]["New Debt Assumptions"] = st.data_editor(
+        st.session_state["debt_inputs"]["New Debt Assumptions"], num_rows="dynamic"
+    )
+
+# Other tabs (Projections, Charts, Valuation) stay the same for now
 
 # --- Tab 3: Projections ---
-with pages[2]:
+with tabs[4]:
     st.subheader("Projections")
     projection_data = {}
 
@@ -101,7 +151,7 @@ with pages[2]:
         st.dataframe(df.set_index("Year").T)
 
 # --- Tab 4: Charts ---
-with pages[3]:
+with tabs[5]:
     st.subheader("Charts")
     metric = st.selectbox("Select Metric", ["Revenue", "EBIT", "Net Income", "FCF"])
     chart_df = pd.DataFrame({
@@ -111,7 +161,7 @@ with pages[3]:
     st.line_chart(chart_df)
 
 # --- Tab 5: Valuation ---
-with pages[4]:
+with tabs[6]:
     st.subheader("Valuation (Discounted Cash Flow)")
     discount_rate = st.number_input("Discount Rate (%)", value=10.0, step=0.5)
     valuations = {}
