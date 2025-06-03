@@ -40,27 +40,40 @@ with tabs[0]:
 # --- Tab 2: Assumptions ---
 with tabs[1]:
     st.subheader("Key Assumptions (Yearly, Scenario-Based)")
+
     scenarios = ["Base", "Optimistic", "Worst"]
     assumption_names = [
-        "Revenue Growth (%)", "COGS (% of Revenue)", "OPEX (% of Revenue)",
-        "Tax Rate (%)", "Depreciation (% of Revenue)", "CapEx (% of Revenue)", "Working Capital (% of Revenue)"
+        "Revenue Growth (%)",
+        "COGS (% of Revenue)",
+        "Admin Expenses (% of Revenue)",
+        "Sales Expenses (% of Revenue)",
+        "Other Income (% of Revenue)",
+        "Other Expenses (% of Revenue)",
+        "Depreciation (% of Revenue)",
+        "CapEx (% of Revenue)",
+        "Working Capital (% of Revenue)",
+        "Tax Rate (%)"
     ]
-    assumptions = {}
+
+    if "assumptions" not in st.session_state:
+        st.session_state["assumptions"] = {}
 
     for name in assumption_names:
-        assumptions[name] = {}
+        if name not in st.session_state["assumptions"]:
+            st.session_state["assumptions"][name] = {}
+
         with st.expander(name):
             for scenario in scenarios:
                 same = st.checkbox(f"Same every year ({scenario})", value=True, key=f"same_{name}_{scenario}")
                 values = []
                 for year in range(1, st.session_state["years"] + 1):
+                    key = f"{name}_{scenario}_{year}"
                     if year == 1 or not same:
-                        val = st.number_input(f"{scenario} - Year {year}", value=10.0, step=1.0, key=f"{name}_{scenario}_{year}")
+                        val = st.number_input(f"{scenario} - Year {year}", value=10.0, step=1.0, key=key)
                     else:
                         val = values[0]
                     values.append(val)
-                assumptions[name][scenario] = values
-
+                st.session_state["assumptions"][name][scenario] = values
 
 # --- Tab 3: Depreciation & Amortization ---
 with tabs[2]:
@@ -140,6 +153,8 @@ def generate_income_statement(revenue, assumptions, d_and_a, interest_paid, inte
 with tabs[4]:
     st.subheader("Projections")
     projection_data = {}
+
+    assumptions = st.session_state["assumptions"]
 
     def generate_income_statement(revenue, assumptions, scenario):
         cogs = [r * assumptions["COGS (% of Revenue)"][scenario][i] / 100 for i, r in enumerate(revenue)]
