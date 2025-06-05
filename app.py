@@ -60,8 +60,16 @@ with tabs[0]:
         })
 
     # Show editable inputs in a data editor
-    st.write("Available columns:", st.session_state["historical_data"].columns.tolist())
-    st.write("Requested columns:", ["Year"] + input_cols)
+    
+    # Rename uploaded columns to match expected input column names
+    column_mapping = {
+        "Revenue": "Ingresos",
+        "COGS": "Costo de Ventas",
+        "OPEX": "Gastos Administración",  # or adjust this mapping depending on your model
+    }
+
+    st.session_state["historical_data"].rename(columns=column_mapping, inplace=True)
+
     df_inputs = st.data_editor(
         st.session_state["historical_data"][["Year"] + input_cols].set_index("Year"),
         num_rows="dynamic",
