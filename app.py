@@ -60,9 +60,9 @@ with tabs[0]:
         })
 
     # Show editable inputs in a data editor
+    st.write("Available columns:", st.session_state["historical_data"].columns.tolist())
+    st.write("Requested columns:", ["Year"] + input_cols)
     df_inputs = st.data_editor(
-        st.write("Available columns:", st.session_state["historical_data"].columns.tolist())
-        st.write("Requested columns:", ["Year"] + input_cols)
         st.session_state["historical_data"][["Year"] + input_cols].set_index("Year"),
         num_rows="dynamic",
         use_container_width=True
