@@ -54,14 +54,6 @@ with tabs[0]:
 
     # Show editable inputs in a data editor
     
-    # Rename uploaded columns to match expected input column names
-    column_mapping = {
-        "Revenue": "Ingresos",
-        "COGS": "Costo de Ventas",
-        "OPEX": "Gastos Administración",  # or adjust this mapping depending on your model
-    }
-
-    st.session_state["historical_data"].rename(columns=column_mapping, inplace=True)
 
     df_inputs = st.data_editor(
         st.session_state["historical_data"][["Year"] + input_cols].set_index("Year"),
@@ -167,6 +159,26 @@ with tabs[0]:
                 total_liabilities[i] + total_equity[i] for i in range(len(historical_years))
             ]
         })
+
+    # Define required balance sheet keys for historical data
+    required_bs_keys = [
+        "cash", "accounts_receivable", "inventory", "other_current_assets",
+        "net_ppe", "net_intangibles", "other_non_current_assets",
+        "accounts_payable", "short_term_debt", "other_current_liabilities",
+        "long_term_debt", "other_non_current_liabilities",
+        "retained_earnings", "other_equity"
+    ]
+
+    # Determine number of historical years based on existing data
+    num_years = len(st.session_state["historical_data"])
+
+    # Initialize historical_data dictionary
+    historical_data = {}
+    for key in required_bs_keys:
+        historical_data[key] = [0.0] * num_years
+
+    # Also define historical_years
+    historical_years = st.session_state["historical_data"]["Year"].tolist()
 
     with st.expander("Balance Sheet"):
         balance_sheet_hist = generate_historical_balance_sheet(historical_data, historical_years)
