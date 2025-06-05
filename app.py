@@ -27,14 +27,12 @@ tabs = st.tabs([
 with tabs[0]:
     st.subheader("Historical Financial Data")
 
-    # Define input columns editable by the user (all base inputs + impuestos y participacion)
     input_cols = [
         "Ingresos", "Costo de Ventas", "Gastos Administración", "Gastos Ventas",
         "Depreciación", "Amortización", "Otros Ingresos No Operativos", "Otros Gastos No Operativos",
         "Resultado Financiero Neto", "Participación de Trabajadores", "Impuestos"
     ]
 
-    # Initialize session_state with default columns if missing
     if "historical_data" not in st.session_state or st.session_state["historical_data"].empty:
         current_year = datetime.now().year
         st.session_state["historical_data"] = pd.DataFrame({
@@ -52,39 +50,33 @@ with tabs[0]:
             "Impuestos": [5000, 5500, 6000]
         })
 
-    # Show editable inputs in a data editor
-    
-
     df_inputs = st.data_editor(
         st.session_state["historical_data"][["Year"] + input_cols].set_index("Year"),
         num_rows="dynamic",
         use_container_width=True
     )
 
-    # Update session state with user edits
     st.session_state["historical_data"].update(df_inputs.reset_index())
 
-    # Extract columns for calculation
-    ingresos = st.session_state["historical_data"]["Ingresos"]
-    costo_ventas = st.session_state["historical_data"]["Costo de Ventas"]
-    gastos_admin = st.session_state["historical_data"]["Gastos Administración"]
-    gastos_ventas = st.session_state["historical_data"]["Gastos Ventas"]
-    depreciacion = st.session_state["historical_data"]["Depreciación"]
-    amortizacion = st.session_state["historical_data"]["Amortización"]
-    otros_ingresos = st.session_state["historical_data"]["Otros Ingresos No Operativos"]
-    otros_gastos = st.session_state["historical_data"]["Otros Gastos No Operativos"]
-    resultado_financiero = st.session_state["historical_data"]["Resultado Financiero Neto"]
-    participacion_trabajadores = st.session_state["historical_data"]["Participación de Trabajadores"]
-    impuestos = st.session_state["historical_data"]["Impuestos"]
+    df_hist = st.session_state["historical_data"]
+    ingresos = df_hist["Ingresos"]
+    costo_ventas = df_hist["Costo de Ventas"]
+    gastos_admin = df_hist["Gastos Administración"]
+    gastos_ventas = df_hist["Gastos Ventas"]
+    depreciacion = df_hist["Depreciación"]
+    amortizacion = df_hist["Amortización"]
+    otros_ingresos = df_hist["Otros Ingresos No Operativos"]
+    otros_gastos = df_hist["Otros Gastos No Operativos"]
+    resultado_financiero = df_hist["Resultado Financiero Neto"]
+    participacion_trabajadores = df_hist["Participación de Trabajadores"]
+    impuestos = df_hist["Impuestos"]
 
-    # Calculate required metrics
     utilidad_bruta = ingresos - costo_ventas
     ebitda = utilidad_bruta - gastos_admin - gastos_ventas
     ebit = ebitda - depreciacion - amortizacion
     ebt = ebit + otros_ingresos - otros_gastos + resultado_financiero
     utilidad_neta = ebt - participacion_trabajadores - impuestos
 
-    # Create income statement DataFrame for display (transpose for readability)
     income_statement = pd.DataFrame({
         "Ingresos": ingresos,
         "Costo de Ventas": costo_ventas,
@@ -102,104 +94,70 @@ with tabs[0]:
         "Participación de Trabajadores": participacion_trabajadores,
         "Impuestos": impuestos,
         "UTILIDAD NETA": utilidad_neta
-    }, index=st.session_state["historical_data"]["Year"]).T
+    }, index=df_hist["Year"]).T
 
     st.markdown("### Income Statement (Calculated Fields & Inputs)")
     st.dataframe(income_statement)
 
-    def generate_historical_balance_sheet(historical_data: dict, historical_years: list) -> pd.DataFrame:
-        total_assets = [
-            historical_data["cash"][i]
-            + historical_data["accounts_receivable"][i]
-            + historical_data["inventory"][i]
-            + historical_data["other_current_assets"][i]
-            + historical_data["net_ppe"][i]
-            + historical_data["net_intangibles"][i]
-            + historical_data["other_non_current_assets"][i]
-            for i in range(len(historical_years))
-        ]
+    # BALANCE SHEET SECTION
+    st.markdown("### Balance Sheet (Inputs & Calculated Totals)")
 
-        total_liabilities = [
-            historical_data["accounts_payable"][i]
-            + historical_data["short_term_debt"][i]
-            + historical_data["other_current_liabilities"][i]
-            + historical_data["long_term_debt"][i]
-            + historical_data["other_non_current_liabilities"][i]
-            for i in range(len(historical_years))
-        ]
+    historical_years = df_hist["Year"].tolist()
+    num_years = len(historical_years)
 
-        total_equity = [
-            historical_data["retained_earnings"][i] + historical_data["other_equity"][i]
-            for i in range(len(historical_years))
-        ]
+    bs_cols = [
+        "Cash", "Accounts Receivable", "Inventory", "Other Current Assets",
+        "Net PPE", "Net Intangibles", "Other Non-Current Assets",
+        "Accounts Payable", "Short-Term Debt", "Other Current Liabilities",
+        "Long-Term Debt", "Other Non-Current Liabilities",
+        "Retained Earnings", "Other Equity"
+    ]
 
-        return pd.DataFrame({
+    if "balance_sheet_inputs" not in st.session_state or st.session_state["balance_sheet_inputs"].empty:
+        st.session_state["balance_sheet_inputs"] = pd.DataFrame({
             "Year": historical_years,
-            "Cash": historical_data["cash"],
-            "Accounts Receivable": historical_data["accounts_receivable"],
-            "Inventory": historical_data["inventory"],
-            "Other Current Assets": historical_data["other_current_assets"],
-            "Net PPE": historical_data["net_ppe"],
-            "Net Intangibles": historical_data["net_intangibles"],
-            "Other Non-Current Assets": historical_data["other_non_current_assets"],
-            "Total Assets": total_assets,
-
-            "Accounts Payable": historical_data["accounts_payable"],
-            "Short-Term Debt": historical_data["short_term_debt"],
-            "Other Current Liabilities": historical_data["other_current_liabilities"],
-            "Long-Term Debt": historical_data["long_term_debt"],
-            "Other Non-Current Liabilities": historical_data["other_non_current_liabilities"],
-            "Total Liabilities": total_liabilities,
-
-            "Retained Earnings": historical_data["retained_earnings"],
-            "Other Equity": historical_data["other_equity"],
-            "Total Equity": total_equity,
-
-            "Total Liabilities + Equity": [
-                total_liabilities[i] + total_equity[i] for i in range(len(historical_years))
-            ]
+            "Cash": [10000.0] * num_years,
+            "Accounts Receivable": [8000.0] * num_years,
+            "Inventory": [7000.0] * num_years,
+            "Other Current Assets": [3000.0] * num_years,
+            "Net PPE": [25000.0] * num_years,
+            "Net Intangibles": [5000.0] * num_years,
+            "Other Non-Current Assets": [2000.0] * num_years,
+            "Accounts Payable": [6000.0] * num_years,
+            "Short-Term Debt": [4000.0] * num_years,
+            "Other Current Liabilities": [3000.0] * num_years,
+            "Long-Term Debt": [10000.0] * num_years,
+            "Other Non-Current Liabilities": [2000.0] * num_years,
+            "Retained Earnings": [8000.0] * num_years,
+            "Other Equity": [5000.0] * num_years
         })
 
-    # Define required balance sheet keys for historical data
-    required_bs_keys = [
-        "cash", "accounts_receivable", "inventory", "other_current_assets",
-        "net_ppe", "net_intangibles", "other_non_current_assets",
-        "accounts_payable", "short_term_debt", "other_current_liabilities",
-        "long_term_debt", "other_non_current_liabilities",
-        "retained_earnings", "other_equity"
-    ]
+    bs_df = st.data_editor(
+        st.session_state["balance_sheet_inputs"].set_index("Year"),
+        num_rows="dynamic",
+        use_container_width=True,
+        key="bs_editor"
+    )
 
-    # Determine number of historical years based on existing data
-    num_years = len(st.session_state["historical_data"])
+    st.session_state["balance_sheet_inputs"].update(bs_df.reset_index())
 
-    # Initialize historical_data dictionary
-    historical_data = {}
-    for key in required_bs_keys:
-        historical_data[key] = [0.0] * num_years
+    # Generate calculated balance sheet totals
+    def generate_historical_balance_sheet(df: pd.DataFrame) -> pd.DataFrame:
+        df = df.copy()
+        df["Total Assets"] = (
+            df["Cash"] + df["Accounts Receivable"] + df["Inventory"] + df["Other Current Assets"]
+            + df["Net PPE"] + df["Net Intangibles"] + df["Other Non-Current Assets"]
+        )
+        df["Total Liabilities"] = (
+            df["Accounts Payable"] + df["Short-Term Debt"] + df["Other Current Liabilities"]
+            + df["Long-Term Debt"] + df["Other Non-Current Liabilities"]
+        )
+        df["Total Equity"] = df["Retained Earnings"] + df["Other Equity"]
+        df["Total Liabilities + Equity"] = df["Total Liabilities"] + df["Total Equity"]
+        return df
 
-    # Also define historical_years
-    historical_years = st.session_state["historical_data"]["Year"].tolist()
-
-    with st.expander("Balance Sheet"):
-        balance_sheet_hist = generate_historical_balance_sheet(historical_data, historical_years)
-        st.dataframe(balance_sheet_hist.style.format("{:,.0f}"), use_container_width=True)
-
-    # Define required balance sheet keys for historical data
-    required_bs_keys = [
-        "cash", "accounts_receivable", "inventory", "other_current_assets",
-        "net_ppe", "net_intangibles", "other_non_current_assets",
-        "accounts_payable", "short_term_debt", "other_current_liabilities",
-        "long_term_debt", "other_non_current_liabilities",
-        "retained_earnings", "other_equity"
-    ]
-
-    # Determine number of historical years based on existing data
-    num_years = len(historical_data.get("revenue", []))
-
-    # Fill missing keys with zeros for each historical year
-    for key in required_bs_keys:
-        if key not in historical_data:
-            historical_data[key] = [0.0] * num_years
+    balance_sheet = generate_historical_balance_sheet(st.session_state["balance_sheet_inputs"])
+    st.dataframe(balance_sheet.set_index("Year").style.format("{:,.0f}"), use_container_width=True)
 
 
 # --- Tab 2: Assumptions ---
