@@ -530,9 +530,6 @@ with tabs[4]:
         })
     base_revenue = st.session_state["historical_data"]["Ingresos"].iloc[-1]
 
-    st.write("Assumptions Keys:", st.session_state["assumptions"].keys())
-    st.write("Revenue Growth:", st.session_state["assumptions"].get("Revenue Growth (%)", {}))
-    st.write("Scenario:", scenario)
 
     for scenario in scenarios:
         st.markdown(f"### Scenario: {scenario}")
