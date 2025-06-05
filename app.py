@@ -363,136 +363,142 @@ with tabs[4]:
 
         return interest_earned, cash_balance
 
-    def generate_income_statement(revenue, assumptions, scenario):
-        cogs = [r * assumptions["COGS (% of Revenue)"][scenario][i] / 100 for i, r in enumerate(revenue)]
-        admin_exp = [r * assumptions["Admin Expenses (% of Revenue)"][scenario][i] / 100 for i, r in enumerate(revenue)]
-        sales_exp = [r * assumptions["Sales Expenses (% of Revenue)"][scenario][i] / 100 for i, r in enumerate(revenue)]
-        other_inc = [r * assumptions["Other Income (% of Revenue)"][scenario][i] / 100 for i, r in enumerate(revenue)]
-        other_exp = [r * assumptions["Other Expenses (% of Revenue)"][scenario][i] / 100 for i, r in enumerate(revenue)]
-        depreciation = [r * assumptions["Depreciation (% of Revenue)"][scenario][i] / 100 for i, r in enumerate(revenue)]
-        amortization = [0 for _ in revenue]  # Placeholder
-        ebitda = [revenue[i] - cogs[i] - admin_exp[i] - sales_exp[i] for i in range(len(revenue))]
-        ebit = [ebitda[i] - depreciation[i] - amortization[i] for i in range(len(revenue))]
+  def generate_income_statement(revenue, assumptions, scenario):
+      years = len(revenue)
 
-        existing_debt = st.session_state["debt_inputs"]["Existing Debt"]
-        new_debt = st.session_state["debt_inputs"]["New Debt Assumptions"]
-        years = len(revenue)
+      def get_assumption(key, default=0.0):
+          if key in assumptions and isinstance(assumptions[key], dict):
+            return assumptions[key].get(scenario, [default] * years)
+           return [default] * years
 
-        ...
+      # Retrieve assumptions safely
+      cogs_pct = get_assumption("COGS (% of Revenue)")
+      admin_pct = get_assumption("Admin Expenses (% of Revenue)")
+      sales_pct = get_assumption("Sales Expenses (% of Revenue)")
+      other_inc_pct = get_assumption("Other Income (% of Revenue)")
+      other_exp_pct = get_assumption("Other Expenses (% of Revenue)")
+      depreciation_pct = get_assumption("Depreciation (% of Revenue)")
+      amortization = [0 for _ in revenue]  # Placeholder
+      tax_rate = get_assumption("Tax Rate (%)", default=25.0)  # Reasonable default
+      capex = get_assumption("Capex", default=0.0)  # Must be defined elsewhere or added in assumptions
 
-        # Calculate interest paid as before
-        interest_paid = calculate_interest_paid(existing_debt, new_debt, years)
+      # Calculate operating components
+      cogs = [r * cogs_pct[i] / 100 for i, r in enumerate(revenue)]
+      admin_exp = [r * admin_pct[i] / 100 for i, r in enumerate(revenue)]
+      sales_exp = [r * sales_pct[i] / 100 for i, r in enumerate(revenue)]
+      other_inc = [r * other_inc_pct[i] / 100 for i, r in enumerate(revenue)]
+      other_exp = [r * other_exp_pct[i] / 100 for i, r in enumerate(revenue)]
+      depreciation = [r * depreciation_pct[i] / 100 for i, r in enumerate(revenue)]
+    
+      ebitda = [revenue[i] - cogs[i] - admin_exp[i] - sales_exp[i] for i in range(years)]
+      ebit = [ebitda[i] - depreciation[i] - amortization[i] for i in range(years)]
 
-        # Calculate interest earned using FCF-based cash balance
-        fcf_placeholder = [0.0 for _ in revenue]  # Temporary for first pass
-        interest_earned, cash_balance = calculate_interest_earned_from_fcf(fcf_placeholder, assumptions, scenario)
+      # Debt info from session state
+      existing_debt = st.session_state["debt_inputs"]["Existing Debt"]
+      new_debt = st.session_state["debt_inputs"]["New Debt Assumptions"]
 
-        # Calculate EBT and everything up to FCF
-        ebt_pre_workers = [ebit[i] - interest_paid[i] + interest_earned[i] + other_inc[i] - other_exp[i] for i in range(len(revenue))]
-        workers_participation = [0.15 * e for e in ebt_pre_workers]
-        taxable_income = [ebt_pre_workers[i] - workers_participation[i] for i in range(len(revenue))]
-        tax_rate = assumptions["Tax Rate (%)"][scenario]
-        taxes = [taxable_income[i] * tax_rate[i] / 100 for i in range(len(revenue))]
-        net_income = [taxable_income[i] - taxes[i] for i in range(len(revenue))]
-        
-        net_working_capital = accounts_receivable + inventory + other_current_assets - accounts_payable - other_current_liabilities
+      # Interest paid & earned (placeholder FCF first)
+      interest_paid = calculate_interest_paid(existing_debt, new_debt, years)
+      fcf_placeholder = [0.0 for _ in revenue]
+      interest_earned, cash_balance = calculate_interest_earned_from_fcf(fcf_placeholder, assumptions, scenario)
 
-        # Final Free Cash Flow calculation (real now)
-        delta_nwc = [net_working_capital[i] - net_working_capital[i - 1] if i > 0 else net_working_capital[0]
-                           for i in range(len(net_working_capital))]
+      # First pass income calculation
+      ebt_pre_workers = [ebit[i] - interest_paid[i] + interest_earned[i] + other_inc[i] - other_exp[i] for i in range(years)]
+      workers_participation = [0.15 * e for e in ebt_pre_workers]
+      taxable_income = [ebt_pre_workers[i] - workers_participation[i] for i in range(years)]
+      taxes = [taxable_income[i] * tax_rate[i] / 100 for i in range(years)]
+      net_income = [taxable_income[i] - taxes[i] for i in range(years)]
 
-        fcf = [
-            ebit[i] - taxes[i] + depreciation[i] - capex[i] - delta_nwc[i]
-            for i in range(len(revenue))
-        ]
-        
-        cash_flow_df = generate_cash_flow_statement(
-            net_income=net_income,
-            depreciation=depreciation,
-            capex=capex,
-            delta_nwc=delta_nwc,
-            debt_data=debt_data,
-            scenario=scenario,
-            initial_cash=historical_data["cash"][-1] if len(historical_data["cash"]) > 0 else 0.0,
-        )
+      # Working Capital placeholders (define your own logic above this function)
+      net_working_capital = accounts_receivable + inventory + other_current_assets - accounts_payable - other_current_liabilities
+      delta_nwc = [net_working_capital[i] - net_working_capital[i - 1] if i > 0 else net_working_capital[0]
+                 for i in range(years)]
 
-        st.subheader("Cash Flow Statement")
-        st.dataframe(cash_flow_df.style.format("{:,.2f}"))
-        st.line_chart(cash_flow_df.set_index("Year")["Ending Cash Balance"])
+      # FCF First Pass
+      fcf = [
+          ebit[i] - taxes[i] + depreciation[i] - capex[i] - delta_nwc[i]
+          for i in range(years)
+      ]
 
-        # Display FCF Table
-        fcf_df = pd.DataFrame({
-            "Year": assumptions[scenario]["years"],
-            "Free Cash Flow": fcf
-        })
-        st.subheader("Free Cash Flow (FCF)")
-        st.dataframe(fcf_df.style.format({"Free Cash Flow": "{:,.2f}"}))
+      # Generate cash flow statement & chart
+      cash_flow_df = generate_cash_flow_statement(
+          net_income=net_income,
+          depreciation=depreciation,
+          capex=capex,
+          delta_nwc=delta_nwc,
+          debt_data=debt_data,
+          scenario=scenario,
+          initial_cash=historical_data["cash"][-1] if len(historical_data["cash"]) > 0 else 0.0,
+      )
 
-        # Optional Chart
-        st.line_chart(fcf_df.set_index("Year"))
+      st.subheader("Cash Flow Statement")
+      st.dataframe(cash_flow_df.style.format("{:,.2f}"))
+      st.line_chart(cash_flow_df.set_index("Year")["Ending Cash Balance"])
 
-        # Recalculate interest earned using real FCF
-        interest_earned, cash_balance = calculate_interest_earned_from_fcf(fcf, assumptions, scenario)
+      # FCF table and chart
+      fcf_df = pd.DataFrame({
+          "Year": assumptions[scenario]["years"],
+          "Free Cash Flow": fcf
+      })
+      st.subheader("Free Cash Flow (FCF)")
+      st.dataframe(fcf_df.style.format({"Free Cash Flow": "{:,.2f}"}))
+      st.line_chart(fcf_df.set_index("Year"))
 
-        # Recalculate EBT → Net Income → FCF again (now with real interest earned)
-        ebt_pre_workers = [ebit[i] - interest_paid[i] + interest_earned[i] + other_inc[i] - other_exp[i] for i in range(len(revenue))]
-        workers_participation = [0.15 * e for e in ebt_pre_workers]
-        taxable_income = [ebt_pre_workers[i] - workers_participation[i] for i in range(len(revenue))]
-        taxes = [taxable_income[i] * tax_rate[i] / 100 for i in range(len(revenue))]
-        net_income = [taxable_income[i] - taxes[i] for i in range(len(revenue))]
-        fcf = [
-            ebit[i] - taxes[i] + depreciation[i] - capex[i] - delta_nwc[i]
-            for i in range(len(revenue))
-        ]
-        
-        cash_flow_df = generate_cash_flow_statement(
-            net_income=net_income,
-            depreciation=depreciation,
-            capex=capex,
-            delta_nwc=delta_nwc,
-            debt_data=debt_data,
-            scenario=scenario,
-            initial_cash=historical_data["cash"][-1] if len(historical_data["cash"]) > 0 else 0.0,
-        )
+      # Recalculate with real FCF-based interest earned
+      interest_earned, cash_balance = calculate_interest_earned_from_fcf(fcf, assumptions, scenario)
+      ebt_pre_workers = [ebit[i] - interest_paid[i] + interest_earned[i] + other_inc[i] - other_exp[i] for i in range(years)]
+      workers_participation = [0.15 * e for e in ebt_pre_workers]
+      taxable_income = [ebt_pre_workers[i] - workers_participation[i] for i in range(years)]
+      taxes = [taxable_income[i] * tax_rate[i] / 100 for i in range(years)]
+      net_income = [taxable_income[i] - taxes[i] for i in range(years)]
+      fcf = [ebit[i] - taxes[i] + depreciation[i] - capex[i] - delta_nwc[i] for i in range(years)]
 
-        st.subheader("Cash Flow Statement")
-        st.dataframe(cash_flow_df.style.format("{:,.2f}"))
-        st.line_chart(cash_flow_df.set_index("Year")["Ending Cash Balance"])
+      # Re-render charts with final FCF
+      cash_flow_df = generate_cash_flow_statement(
+          net_income=net_income,
+          depreciation=depreciation,
+          capex=capex,
+          delta_nwc=delta_nwc,
+          debt_data=debt_data,
+          scenario=scenario,
+          initial_cash=historical_data["cash"][-1] if len(historical_data["cash"]) > 0 else 0.0,
+      )
 
-        # Display FCF Table
-        fcf_df = pd.DataFrame({
-            "Year": assumptions[scenario]["years"],
-            "Free Cash Flow": fcf
-        })
-        st.subheader("Free Cash Flow (FCF)")
-        st.dataframe(fcf_df.style.format({"Free Cash Flow": "{:,.2f}"}))
+      st.subheader("Cash Flow Statement")
+      st.dataframe(cash_flow_df.style.format("{:,.2f}"))
+      st.line_chart(cash_flow_df.set_index("Year")["Ending Cash Balance"])
 
-        # Optional Chart
-        st.line_chart(fcf_df.set_index("Year"))
+      fcf_df = pd.DataFrame({
+          "Year": assumptions[scenario]["years"],
+          "Free Cash Flow": fcf
+      })
+      st.subheader("Free Cash Flow (FCF)")
+      st.dataframe(fcf_df.style.format({"Free Cash Flow": "{:,.2f}"}))
+      st.line_chart(fcf_df.set_index("Year"))
 
-        return pd.DataFrame({
-            "Year": [datetime.now().year + i for i in range(len(revenue))],
-            "Revenue": revenue,
-            "COGS": cogs,
-            "Admin Expenses": admin_exp,
-            "Sales Expenses": sales_exp,
-            "EBITDA": ebitda,
-            "Depreciation": depreciation,
-            "Amortization": amortization,
-            "EBIT": ebit,
-            "Interest Paid": interest_paid,
-            "Interest Earned": interest_earned,
-            "Cash Balance": cash_balance,
-            "Other Income": other_inc,
-            "Other Expenses": other_exp,
-            "EBT (Pre Workers)": ebt_pre_workers,
-            "Workers Participation": workers_participation,
-            "Taxable Income": taxable_income,
-            "Taxes": taxes,
-            "Net Income": net_income,
-            "Free Cash Flow": fcf
-        })
-
+      # Final output dataframe
+      return pd.DataFrame({
+          "Year": [datetime.now().year + i for i in range(years)],
+          "Revenue": revenue,
+          "COGS": cogs,
+          "Admin Expenses": admin_exp,
+          "Sales Expenses": sales_exp,
+          "EBITDA": ebitda,
+          "Depreciation": depreciation,
+          "Amortization": amortization,
+          "EBIT": ebit,
+          "Interest Paid": interest_paid,
+          "Interest Earned": interest_earned,
+          "Cash Balance": cash_balance,
+          "Other Income": other_inc,
+          "Other Expenses": other_exp,
+          "EBT (Pre Workers)": ebt_pre_workers,
+          "Workers Participation": workers_participation,
+          "Taxable Income": taxable_income,
+          "Taxes": taxes,
+          "Net Income": net_income,
+          "Free Cash Flow": fcf
+      })
     base_revenue = st.session_state["historical_data"]["Ingresos"].iloc[-1]
 
     for scenario in scenarios:
