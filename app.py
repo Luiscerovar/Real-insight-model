@@ -323,6 +323,8 @@ with tabs[4]:
             net_working_capital.append(nwc)
 
         return receivables, payables, inventory, net_working_capital
+    
+    st.write("New Debt Columns:", new_debt.columns.tolist())
 
     def calculate_interest_paid(existing_debt, new_debt, years):
         interest_paid = [0.0 for _ in range(years)]
