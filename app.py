@@ -394,6 +394,8 @@ with tabs[4]:
         tax_rate = assumptions["Tax Rate (%)"][scenario]
         taxes = [taxable_income[i] * tax_rate[i] / 100 for i in range(len(revenue))]
         net_income = [taxable_income[i] - taxes[i] for i in range(len(revenue))]
+        
+        net_working_capital = accounts_receivable + inventory + other_current_assets - accounts_payable - other_current_liabilities
 
         # Final Free Cash Flow calculation (real now)
         delta_nwc = [net_working_capital[i] - net_working_capital[i - 1] if i > 0 else net_working_capital[0]
