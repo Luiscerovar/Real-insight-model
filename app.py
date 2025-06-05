@@ -380,7 +380,8 @@ with tabs[4]:
         depreciation_pct = get_assumption("Depreciation (% of Revenue)")
         amortization = [0 for _ in revenue]  # Placeholder
         tax_rate = get_assumption("Tax Rate (%)", default=25.0)  # Reasonable default
-        capex = get_assumption("Capex", default=0.0)  # Must be defined elsewhere or added in assumptions
+        capex_df = st.session_state["da_inputs"]["CapEx Forecast"]
+        capex = capex_df["CapEx"].tolist()
 
         # Calculate operating components
         cogs = [r * cogs_pct[i] / 100 for i, r in enumerate(revenue)]
