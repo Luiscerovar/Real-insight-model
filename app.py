@@ -405,7 +405,7 @@ with tabs[4]:
         new_debt = st.session_state["debt_inputs"]["New Debt Assumptions"]
         years = len(revenue)
 
-            ...
+        ...
 
         # Calculate interest paid as before
         interest_paid = calculate_interest_paid(existing_debt, new_debt, years)
