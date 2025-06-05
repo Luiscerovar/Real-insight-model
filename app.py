@@ -470,6 +470,15 @@ with tabs[4]:
         net_income = [taxable_income[i] - taxes[i] for i in range(years)]
         fcf = [ebit[i] - taxes[i] + depreciation[i] - capex[i] - delta_nwc[i] for i in range(years)]
 
+        debt_data = {
+            scenario: {
+                "years": [datetime.now().year + i for i in range(years)],
+                "new_debt": new_debt["Amount"],
+                "debt_repayment": new_debt["Repayment"],
+                "interest_paid": interest_paid
+            }
+        }
+
         # Re-render charts with final FCF
         cash_flow_df = generate_cash_flow_statement(
             net_income=net_income,
