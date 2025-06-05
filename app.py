@@ -11,13 +11,6 @@ st.set_page_config(page_title="Financial Model", layout="wide")
 if "years" not in st.session_state:
     st.session_state["years"] = 5
 
-if "historical_data" not in st.session_state:
-    st.session_state["historical_data"] = pd.DataFrame({
-        "Year": [datetime.now().year - i for i in range(1, 4)][::-1],
-        "Revenue": [100000, 120000, 140000],
-        "COGS": [40000, 48000, 56000],
-        "OPEX": [30000, 32000, 34000]
-    })
 
 # Sidebar controls
 st.sidebar.header("Settings")
