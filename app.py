@@ -113,57 +113,57 @@ with tabs[0]:
     st.dataframe(income_statement)
 
     def generate_historical_balance_sheet(historical_data: dict, historical_years: list) -> pd.DataFrame:
-    total_assets = [
-        historical_data["cash"][i]
-        + historical_data["accounts_receivable"][i]
-        + historical_data["inventory"][i]
-        + historical_data["other_current_assets"][i]
-        + historical_data["net_ppe"][i]
-        + historical_data["net_intangibles"][i]
-        + historical_data["other_non_current_assets"][i]
-        for i in range(len(historical_years))
-    ]
-
-    total_liabilities = [
-        historical_data["accounts_payable"][i]
-        + historical_data["short_term_debt"][i]
-        + historical_data["other_current_liabilities"][i]
-        + historical_data["long_term_debt"][i]
-        + historical_data["other_non_current_liabilities"][i]
-        for i in range(len(historical_years))
-    ]
-
-    total_equity = [
-        historical_data["retained_earnings"][i] + historical_data["other_equity"][i]
-        for i in range(len(historical_years))
-    ]
-
-    return pd.DataFrame({
-        "Year": historical_years,
-        "Cash": historical_data["cash"],
-        "Accounts Receivable": historical_data["accounts_receivable"],
-        "Inventory": historical_data["inventory"],
-        "Other Current Assets": historical_data["other_current_assets"],
-        "Net PPE": historical_data["net_ppe"],
-        "Net Intangibles": historical_data["net_intangibles"],
-        "Other Non-Current Assets": historical_data["other_non_current_assets"],
-        "Total Assets": total_assets,
-
-        "Accounts Payable": historical_data["accounts_payable"],
-        "Short-Term Debt": historical_data["short_term_debt"],
-        "Other Current Liabilities": historical_data["other_current_liabilities"],
-        "Long-Term Debt": historical_data["long_term_debt"],
-        "Other Non-Current Liabilities": historical_data["other_non_current_liabilities"],
-        "Total Liabilities": total_liabilities,
-
-        "Retained Earnings": historical_data["retained_earnings"],
-        "Other Equity": historical_data["other_equity"],
-        "Total Equity": total_equity,
-
-        "Total Liabilities + Equity": [
-            total_liabilities[i] + total_equity[i] for i in range(len(historical_years))
+        total_assets = [
+            historical_data["cash"][i]
+            + historical_data["accounts_receivable"][i]
+            + historical_data["inventory"][i]
+            + historical_data["other_current_assets"][i]
+            + historical_data["net_ppe"][i]
+            + historical_data["net_intangibles"][i]
+            + historical_data["other_non_current_assets"][i]
+            for i in range(len(historical_years))
         ]
-    })
+
+        total_liabilities = [
+            historical_data["accounts_payable"][i]
+            + historical_data["short_term_debt"][i]
+            + historical_data["other_current_liabilities"][i]
+            + historical_data["long_term_debt"][i]
+            + historical_data["other_non_current_liabilities"][i]
+            for i in range(len(historical_years))
+        ]
+
+        total_equity = [
+            historical_data["retained_earnings"][i] + historical_data["other_equity"][i]
+            for i in range(len(historical_years))
+        ]
+
+        return pd.DataFrame({
+            "Year": historical_years,
+            "Cash": historical_data["cash"],
+            "Accounts Receivable": historical_data["accounts_receivable"],
+            "Inventory": historical_data["inventory"],
+            "Other Current Assets": historical_data["other_current_assets"],
+            "Net PPE": historical_data["net_ppe"],
+            "Net Intangibles": historical_data["net_intangibles"],
+            "Other Non-Current Assets": historical_data["other_non_current_assets"],
+            "Total Assets": total_assets,
+
+            "Accounts Payable": historical_data["accounts_payable"],
+            "Short-Term Debt": historical_data["short_term_debt"],
+            "Other Current Liabilities": historical_data["other_current_liabilities"],
+            "Long-Term Debt": historical_data["long_term_debt"],
+            "Other Non-Current Liabilities": historical_data["other_non_current_liabilities"],
+            "Total Liabilities": total_liabilities,
+
+            "Retained Earnings": historical_data["retained_earnings"],
+            "Other Equity": historical_data["other_equity"],
+            "Total Equity": total_equity,
+
+            "Total Liabilities + Equity": [
+                total_liabilities[i] + total_equity[i] for i in range(len(historical_years))
+            ]
+        })
 
     with st.expander("Balance Sheet"):
         balance_sheet_hist = generate_historical_balance_sheet(historical_data, historical_years)
