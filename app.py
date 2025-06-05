@@ -410,7 +410,24 @@ with tabs[4]:
         net_income = [taxable_income[i] - taxes[i] for i in range(years)]
 
         # Working Capital placeholders (define your own logic above this function)
-        net_working_capital = accounts_receivable + inventory + other_current_assets - accounts_payable - other_current_liabilities
+        # --- Working Capital Calculations ---
+        days_receivables = assumptions["Days Receivables"][scenario]
+        days_inventory = assumptions["Days Inventory"][scenario]
+        days_payables = assumptions["Days Payables"][scenario]
+
+        accounts_receivable = [revenue[i] * days_receivables[i] / 365 for i in range(len(revenue))]
+        inventory = [cogs[i] * days_inventory[i] / 365 for i in range(len(revenue))]
+        accounts_payable = [cogs[i] * days_payables[i] / 365 for i in range(len(revenue))]
+
+        # Assuming no other current assets/liabilities for now
+        other_current_assets = [0 for _ in revenue]
+        other_current_liabilities = [0 for _ in revenue]
+
+        net_working_capital = [
+            accounts_receivable[i] + inventory[i] + other_current_assets[i]
+            - accounts_payable[i] - other_current_liabilities[i]
+            for i in range(len(revenue))
+        ]
         delta_nwc = [net_working_capital[i] - net_working_capital[i - 1] if i > 0 else net_working_capital[0]
                      for i in range(years)]
 
