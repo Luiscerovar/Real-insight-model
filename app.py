@@ -323,8 +323,6 @@ with tabs[4]:
             net_working_capital.append(nwc)
 
         return receivables, payables, inventory, net_working_capital
-    
-    st.write("New Debt Columns:", new_debt.columns.tolist())
 
     def calculate_interest_paid(existing_debt, new_debt, years):
         interest_paid = [0.0 for _ in range(years)]
@@ -399,6 +397,8 @@ with tabs[4]:
         # Debt info from session state
         existing_debt = st.session_state["debt_inputs"]["Existing Debt"]
         new_debt = st.session_state["debt_inputs"]["New Debt Assumptions"]
+
+        st.write("New Debt Columns:", new_debt.columns.tolist())
 
         # Interest paid & earned (placeholder FCF first)
         interest_paid = calculate_interest_paid(existing_debt, new_debt, years)
