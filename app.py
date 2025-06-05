@@ -268,6 +268,18 @@ with tabs[3]:
                 "Term (Years)": [3 for _ in range(st.session_state["years"])]
             })
         }
+    
+    new_debt = st.data_editor(
+        st.session_state["debt_inputs"]["New Debt Assumptions"],
+        num_rows="dynamic"
+    )
+
+    new_debt["Repayment"] = new_debt.apply(
+        lambda row: row["Amount"] / row["Term (Years)"] if row["Term (Years)"] else 0,
+        axis=1
+    )
+
+    st.session_state["debt_inputs"]["New Debt Assumptions"] = new_debt
 
     st.markdown("### Existing Debt")
     st.session_state["debt_inputs"]["Existing Debt"] = st.data_editor(
