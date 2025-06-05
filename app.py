@@ -489,7 +489,7 @@ with tabs[4]:
             delta_nwc=delta_nwc,
             debt_data=debt_data,
             scenario=scenario,
-            historical_data = st.session_state.get("historical_data", {})
+            historical_data = st.session_state.get("historical_data", {}),
             initial_cash = historical_data.get("Efectivo y Equivalentes", [0.0])[-1] if "Efectivo y Equivalentes" in historical_data else 0.0
         )
 
