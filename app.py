@@ -438,6 +438,15 @@ with tabs[4]:
             for i in range(years)
         ]
 
+        debt_data = {
+            scenario: {
+                "years": [datetime.now().year + i for i in range(years)],
+                "new_debt": new_debt["Amount"],
+                "debt_repayment": new_debt["Repayment"],
+                "interest_paid": interest_paid
+            }
+        }
+
         # Generate cash flow statement & chart
         cash_flow_df = generate_cash_flow_statement(
             net_income=net_income,
@@ -471,14 +480,6 @@ with tabs[4]:
         net_income = [taxable_income[i] - taxes[i] for i in range(years)]
         fcf = [ebit[i] - taxes[i] + depreciation[i] - capex[i] - delta_nwc[i] for i in range(years)]
 
-        debt_data = {
-            scenario: {
-                "years": [datetime.now().year + i for i in range(years)],
-                "new_debt": new_debt["Amount"],
-                "debt_repayment": new_debt["Repayment"],
-                "interest_paid": interest_paid
-            }
-        }
 
         # Re-render charts with final FCF
         cash_flow_df = generate_cash_flow_statement(
@@ -488,7 +489,8 @@ with tabs[4]:
             delta_nwc=delta_nwc,
             debt_data=debt_data,
             scenario=scenario,
-            initial_cash=historical_data["cash"][-1] if len(historical_data["cash"]) > 0 else 0.0,
+            historical_data = st.session_state.get("historical_data", {})
+            initial_cash = historical_data.get("Efectivo y Equivalentes", [0.0])[-1] if "Efectivo y Equivalentes" in historical_data else 0.0
         )
 
         st.subheader("Cash Flow Statement")
