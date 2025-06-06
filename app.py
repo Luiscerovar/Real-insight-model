@@ -417,12 +417,6 @@ with tabs[4]:
         # Interest paid & earned (placeholder FCF first)
         interest_paid = calculate_interest_paid(existing_debt, new_debt, years)
 
-        # First pass income calculation
-        workers_participation = [0.15 * e for e in ebt_pre_workers]
-        taxable_income = [ebt_pre_workers[i] - workers_participation[i] for i in range(years)]
-        taxes = [taxable_income[i] * tax_rate[i] / 100 for i in range(years)]
-        net_income = [taxable_income[i] - taxes[i] for i in range(years)]
-
         # Working Capital placeholders (define your own logic above this function)
         # --- Working Capital Calculations ---
         days_receivables = assumptions["Days Receivables"][scenario]
