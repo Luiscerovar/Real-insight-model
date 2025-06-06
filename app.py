@@ -287,9 +287,7 @@ with tabs[3]:
     )
 
     st.markdown("### New Debt Assumptions")
-    st.session_state["debt_inputs"]["New Debt Assumptions"] = st.data_editor(
-        st.session_state["debt_inputs"]["New Debt Assumptions"], num_rows="dynamic"
-    )
+    
 
 # Other tabs (Projections, Charts, Valuation) stay the same for now
 
@@ -374,6 +372,53 @@ with tabs[4]:
             cash_balance.append(cash_for_interest)
 
         return interest_earned, cash_balance
+
+    def generate_cash_flow_statement(
+        net_income: list,
+        depreciation: list,
+        capex: list,
+        delta_nwc: list,
+        debt_data: dict,
+        scenario: str,
+        initial_cash: float = 0.0
+    ) -> pd.DataFrame:
+        years = debt_data[scenario]["years"]
+        new_debt = debt_data[scenario]["new_debt"]
+        debt_repayment = debt_data[scenario]["debt_repayment"]
+        interest_paid = debt_data[scenario]["interest_paid"]
+
+        cash_from_ops = [
+            net_income[i] + depreciation[i] - delta_nwc[i]
+            for i in range(len(years))
+        ]
+    
+        cash_from_investing = [-capex[i] for i in range(len(years))]
+    
+        cash_from_financing = [
+            new_debt[i] - debt_repayment[i] - interest_paid[i]
+            for i in range(len(years))
+        ]
+    
+        net_cash_flow = [
+            cash_from_ops[i] + cash_from_investing[i] + cash_from_financing[i]
+            for i in range(len(years))
+        ]
+
+        ending_cash = []
+        for i in range(len(years)):
+            if i == 0:
+                ending_cash.append(initial_cash + net_cash_flow[i])
+            else:
+                ending_cash.append(ending_cash[i - 1] + net_cash_flow[i])
+
+        return pd.DataFrame({
+            "Year": years,
+            "Cash from Operating": cash_from_ops,
+            "Cash from Investing": cash_from_investing,
+            "Cash from Financing": cash_from_financing,
+            "Net Cash Flow": net_cash_flow,
+            "Ending Cash Balance": ending_cash,
+        })
 
     def generate_income_statement(revenue, assumptions, scenario):
         years = len(revenue)
@@ -461,6 +506,13 @@ with tabs[4]:
             }
         }
 
+        # Retrieve the latest historical cash balance
+        balance_sheet_inputs = st.session_state.get("balance_sheet_inputs", pd.DataFrame())
+        if not balance_sheet_inputs.empty and "Cash" in balance_sheet_inputs.columns:
+            initial_cash = balance_sheet_inputs.sort_values("Year")["Cash"].iloc[-1]
+        else:
+        initial_cash = 0.0
+
         # Generate cash flow statement & chart
         cash_flow_df = generate_cash_flow_statement(
             net_income=net_income,
@@ -469,7 +521,7 @@ with tabs[4]:
             delta_nwc=delta_nwc,
             debt_data=debt_data,
             scenario=scenario,
-            initial_cash=historical_data["cash"][-1] if len(historical_data["cash"]) > 0 else 0.0,
+            initial_cash=initial_cash,
         )
 
         st.subheader("Cash Flow Statement")
@@ -503,8 +555,7 @@ with tabs[4]:
             delta_nwc=delta_nwc,
             debt_data=debt_data,
             scenario=scenario,
-            historical_data = st.session_state.get("historical_data", {}),
-            initial_cash = historical_data.get("Efectivo y Equivalentes", [0.0])[-1] if "Efectivo y Equivalentes" in historical_data else 0.0
+            initial_cash = initial_cash
         )
 
         st.subheader("Cash Flow Statement")
@@ -552,53 +603,7 @@ with tabs[4]:
         df_proj = generate_income_statement(revenue, st.session_state["assumptions"], scenario)
         projection_results[scenario] = df_proj
         st.dataframe(df_proj)
-
-    def generate_cash_flow_statement(
-        net_income: list,
-        depreciation: list,
-        capex: list,
-        delta_nwc: list,
-        debt_data: dict,
-        scenario: str,
-        initial_cash: float = 0.0
-    ) -> pd.DataFrame:
-        years = debt_data[scenario]["years"]
-        new_debt = debt_data[scenario]["new_debt"]
-        debt_repayment = debt_data[scenario]["debt_repayment"]
-        interest_paid = debt_data[scenario]["interest_paid"]
-
-        cash_from_ops = [
-            net_income[i] + depreciation[i] - delta_nwc[i]
-            for i in range(len(years))
-        ]
-    
-        cash_from_investing = [-capex[i] for i in range(len(years))]
-    
-        cash_from_financing = [
-            new_debt[i] - debt_repayment[i] - interest_paid[i]
-            for i in range(len(years))
-        ]
-    
-        net_cash_flow = [
-            cash_from_ops[i] + cash_from_investing[i] + cash_from_financing[i]
-            for i in range(len(years))
-        ]
-
-        ending_cash = []
-        for i in range(len(years)):
-            if i == 0:
-                ending_cash.append(initial_cash + net_cash_flow[i])
-            else:
-                ending_cash.append(ending_cash[i - 1] + net_cash_flow[i])
-
-        return pd.DataFrame({
-            "Year": years,
-            "Cash from Operating": cash_from_ops,
-            "Cash from Investing": cash_from_investing,
-            "Cash from Financing": cash_from_financing,
-            "Net Cash Flow": net_cash_flow,
-            "Ending Cash Balance": ending_cash,
-        }) 
+ 
 
     def generate_balance_sheet(
         years: list,
