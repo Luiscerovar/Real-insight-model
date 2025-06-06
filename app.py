@@ -454,14 +454,6 @@ with tabs[4]:
         else:
             initial_cash = 0.0
 
-        # FCF table and chart
-        fcf_df = pd.DataFrame({
-            "Year": assumptions[scenario]["years"],
-            "Free Cash Flow": fcf
-        })
-        st.subheader("Free Cash Flow (FCF)")
-        st.dataframe(fcf_df.style.format({"Free Cash Flow": "{:,.2f}"}))
-        st.line_chart(fcf_df.set_index("Year"))
 
         # Recalculate with real FCF-based interest earned
         interest_earned, cash_balance = calculate_interest_earned_from_cash_balance(fcf, assumptions, scenario, initial_cash)
