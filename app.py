@@ -462,7 +462,6 @@ with tabs[4]:
                 "interest_paid": interest_paid
             }
         }
-
         # Retrieve the latest historical cash balance
         balance_sheet_inputs = st.session_state.get("balance_sheet_inputs", pd.DataFrame())
         if not balance_sheet_inputs.empty and "Cash" in balance_sheet_inputs.columns:
