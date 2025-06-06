@@ -467,7 +467,7 @@ with tabs[4]:
         if not balance_sheet_inputs.empty and "Cash" in balance_sheet_inputs.columns:
             initial_cash = balance_sheet_inputs.sort_values("Year")["Cash"].iloc[-1]
         else:
-        initial_cash = 0.0
+            initial_cash = 0.0
 
         # Generate cash flow statement & chart
         cash_flow_df = generate_cash_flow_statement(
