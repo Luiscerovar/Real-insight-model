@@ -418,7 +418,6 @@ with tabs[4]:
         interest_paid = calculate_interest_paid(existing_debt, new_debt, years)
 
         # First pass income calculation
-        ebt_pre_workers = [ebit[i] - interest_paid[i] + interest_earned[i] + other_inc[i] - other_exp[i] for i in range(years)]
         workers_participation = [0.15 * e for e in ebt_pre_workers]
         taxable_income = [ebt_pre_workers[i] - workers_participation[i] for i in range(years)]
         taxes = [taxable_income[i] * tax_rate[i] / 100 for i in range(years)]
