@@ -454,21 +454,6 @@ with tabs[4]:
         else:
             initial_cash = 0.0
 
-        # Generate cash flow statement & chart
-        cash_flow_df = generate_cash_flow_statement(
-            net_income=net_income,
-            depreciation=depreciation,
-            capex=capex,
-            delta_nwc=delta_nwc,
-            debt_data=debt_data,
-            scenario=scenario,
-            initial_cash=initial_cash,
-        )
-
-        st.subheader("Cash Flow Statement")
-        st.dataframe(cash_flow_df.style.format("{:,.2f}"))
-        st.line_chart(cash_flow_df.set_index("Year")["Ending Cash Balance"])
-
         # FCF table and chart
         fcf_df = pd.DataFrame({
             "Year": assumptions[scenario]["years"],
