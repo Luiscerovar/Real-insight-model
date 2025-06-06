@@ -416,8 +416,6 @@ with tabs[4]:
 
         # Interest paid & earned (placeholder FCF first)
         interest_paid = calculate_interest_paid(existing_debt, new_debt, years)
-    
-        interest_earned, cash_balance = calculate_interest_earned_from_cash_balance(fcf, assumptions, scenario, initial_cash)
 
         # First pass income calculation
         ebt_pre_workers = [ebit[i] - interest_paid[i] + interest_earned[i] + other_inc[i] - other_exp[i] for i in range(years)]
