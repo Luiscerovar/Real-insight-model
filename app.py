@@ -439,12 +439,6 @@ with tabs[4]:
         delta_nwc = [net_working_capital[i] - net_working_capital[i - 1] if i > 0 else net_working_capital[0]
                      for i in range(years)]
 
-        # FCF First Pass
-        fcf = [
-            ebit[i] - taxes[i] + depreciation[i] - capex[i] - delta_nwc[i]
-            for i in range(years)
-        ]
-
         debt_data = {
             scenario: {
                 "years": [datetime.now().year + i for i in range(years)],
