@@ -296,378 +296,126 @@ def generate_income_statement(revenue, assumptions, d_and_a, interest_paid, inte
     ...
 # --- Tab 5: Projections ---
 with tabs[4]:
-    st.subheader("Projections")
+    st.header("Projections")
 
-    scenarios = ["Base", "Optimistic", "Worst"]
-    projection_results = {}
+    # Selección de escenario
+    scenario = st.selectbox("Select scenario", ["Base", "Optimistic", "Worst"])
+    assumptions = assumptions_data[scenario]
 
-    def calculate_revenue(base_revenue, growth_rates):
-        revenue = [base_revenue]
-        for rate in growth_rates[1:]:
-            revenue.append(revenue[-1] * (1 + rate / 100))
-        return revenue
+    # Subtabs: Income Statement, Cash Flow, Balance Sheet
+    subtab_labels = ["Estado de Resultados", "Flujo de Caja", "Balance General"]
+    subtab_objs = st.tabs(subtab_labels)
 
-    def calculate_working_capital(revenue, cogs, assumptions, scenario):
-        days_receivables = assumptions["Days Receivables"][scenario]
-        days_payables = assumptions["Days Payables"][scenario]
-        days_inventory = assumptions["Days Inventory"][scenario]
+    # Inicialización de estructuras de datos
+    income_statement = []
+    cash_flow = []
+    balance_sheet = []
 
-        receivables = []
-        payables = []
-        inventory = []
-        net_working_capital = []
+    historical_years = historical_data['Year'].tolist()
+    start_year = max(historical_years)
+    projection_years = list(range(start_year + 1, start_year + assumptions['projection_years'] + 1))
 
-        for i in range(len(revenue)):
-            annual_revenue = revenue[i]
-            annual_cogs = cogs[i]
+    # Valores iniciales desde el último año histórico
+    last_row = historical_data[historical_data['Year'] == start_year].iloc[0]
+    prev_cash = last_row["Cash"]
+    prev_assets = last_row["Total Assets"]
+    prev_equity = last_row["Equity"]
+    prev_debt = last_row["Short-term Debt"] + last_row["Long-term Debt"]
 
-            receivable = annual_revenue * days_receivables[i] / 365
-            payable = annual_cogs * days_payables[i] / 365
-            inv = annual_cogs * days_inventory[i] / 365
+    for year in projection_years:
+        # --- Estado de Resultados ---
+        revenue = assumptions["Revenue"][0] * (1 + assumptions["Revenue Growth"]/100) ** (year - projection_years[0])
+        cogs = revenue * assumptions["COGS %"] / 100
+        admin_expenses = revenue * assumptions["Admin Expenses %"] / 100
+        sales_expenses = revenue * assumptions["Sales Expenses %"] / 100
+        other_income = revenue * assumptions["Other Income %"] / 100
 
-            nwc = receivable + inv - payable
+        # Depreciación y Amortización
+        d_a = d_and_a_data.get(year, 0)
 
-            receivables.append(receivable)
-            payables.append(payable)
-            inventory.append(inv)
-            net_working_capital.append(nwc)
+        # EBIT
+        ebit = revenue - cogs - admin_expenses - sales_expenses + other_income - d_a
 
-        return receivables, payables, inventory, net_working_capital
+        # Intereses
+        interest_expense = debt_data.get('interest_expense', {}).get(year, 0)
+        interest_income = prev_cash * assumptions["Interest Rate on Cash"] / 100
 
-    def calculate_interest_paid(existing_debt, new_debt, years):
-        interest_paid = [0.0 for _ in range(years)]
-        for _, row in existing_debt.iterrows():
-            balance = row["Beginning Balance"]
-            rate = row["Interest Rate (%)"] / 100
-            term = int(row["Term (Years)"])
-            for i in range(min(term, years)):
-                interest_paid[i] += balance * rate
-        for i, row in new_debt.iterrows():
-            year_index = i
-            amount = row["Amount"]
-            rate = row["Interest Rate (%)"] / 100
-            term = int(row["Term (Years)"])
-            for j in range(term):
-                if year_index + j < years:
-                    interest_paid[year_index + j] += amount * rate
-        return interest_paid
+        ebt = ebit - interest_expense + interest_income
 
-    def calculate_interest_earned_from_cash_balance(fcf, assumptions, scenario, initial_cash):
-        interest_earned = []
-        cash_balance = []
+        # Impuesto (ajustado por participación de trabajadores)
+        workers_participation = 0.15 * ebt if ebt > 0 else 0
+        taxable_income = ebt - workers_participation
+        taxes = taxable_income * assumptions["Tax Rate"] / 100 if taxable_income > 0 else 0
 
-        interest_rate = assumptions["Interest Rate Earned on Cash (%)"][scenario]
-        min_cash = assumptions["Minimum Cash Balance"][scenario]
+        net_income = ebt - taxes
 
-        prior_cash = initial_cash
-
-        for i in range(len(fcf)):
-            # Enforce minimum cash balance
-            cash_for_interest = max(prior_cash, min_cash[i])
-            earned = cash_for_interest * interest_rate[i] / 100
-
-            interest_earned.append(earned)
-
-            # Update cash balance after applying this year’s FCF
-            current_cash = prior_cash + fcf[i]
-            cash_balance.append(current_cash)
-
-            # Set up for next loop
-            prior_cash = current_cash
-
-        return interest_earned, cash_balance
-
-    def generate_income_statement(revenue, assumptions, scenario):
-        years = len(revenue)
-
-        def get_assumption(key, default=0.0):
-            if key in assumptions and isinstance(assumptions[key], dict):
-                return assumptions[key].get(scenario, [default] * years)
-            return [default] * years
-
-        # Retrieve assumptions safely
-        cogs_pct = get_assumption("COGS (% of Revenue)")
-        admin_pct = get_assumption("Admin Expenses (% of Revenue)")
-        sales_pct = get_assumption("Sales Expenses (% of Revenue)")
-        other_inc_pct = get_assumption("Other Income (% of Revenue)")
-        other_exp_pct = get_assumption("Other Expenses (% of Revenue)")
-        depreciation_pct = get_assumption("Depreciation (% of Revenue)")
-        amortization = [0 for _ in revenue]  # Placeholder
-        tax_rate = get_assumption("Tax Rate (%)", default=25.0)  # Reasonable default
-        capex_df = st.session_state["da_inputs"]["CapEx Forecast"]
-        capex = capex_df["CapEx"].tolist()
-
-        # Calculate operating components
-        cogs = [r * cogs_pct[i] / 100 for i, r in enumerate(revenue)]
-        admin_exp = [r * admin_pct[i] / 100 for i, r in enumerate(revenue)]
-        sales_exp = [r * sales_pct[i] / 100 for i, r in enumerate(revenue)]
-        other_inc = [r * other_inc_pct[i] / 100 for i, r in enumerate(revenue)]
-        other_exp = [r * other_exp_pct[i] / 100 for i, r in enumerate(revenue)]
-        depreciation = [r * depreciation_pct[i] / 100 for i, r in enumerate(revenue)]
-    
-        ebitda = [revenue[i] - cogs[i] - admin_exp[i] - sales_exp[i] for i in range(years)]
-        ebit = [ebitda[i] - depreciation[i] - amortization[i] for i in range(years)]
-
-        # Debt info from session state
-        existing_debt = st.session_state["debt_inputs"]["Existing Debt"]
-        new_debt = st.session_state["debt_inputs"]["New Debt Assumptions"]
-
-        st.write("New Debt Columns:", new_debt.columns.tolist())
-
-        # Interest paid & earned (placeholder FCF first)
-        interest_paid = calculate_interest_paid(existing_debt, new_debt, years)
-
-        # Working Capital placeholders (define your own logic above this function)
-        # --- Working Capital Calculations ---
-        days_receivables = assumptions["Days Receivables"][scenario]
-        days_inventory = assumptions["Days Inventory"][scenario]
-        days_payables = assumptions["Days Payables"][scenario]
-
-        accounts_receivable = [revenue[i] * days_receivables[i] / 365 for i in range(len(revenue))]
-        inventory = [cogs[i] * days_inventory[i] / 365 for i in range(len(revenue))]
-        accounts_payable = [cogs[i] * days_payables[i] / 365 for i in range(len(revenue))]
-
-        # Assuming no other current assets/liabilities for now
-        other_current_assets = [0 for _ in revenue]
-        other_current_liabilities = [0 for _ in revenue]
-
-        net_working_capital = [
-            accounts_receivable[i] + inventory[i] + other_current_assets[i]
-            - accounts_payable[i] - other_current_liabilities[i]
-            for i in range(len(revenue))
-        ]
-        delta_nwc = [net_working_capital[i] - net_working_capital[i - 1] if i > 0 else net_working_capital[0]
-                     for i in range(years)]
-
-        debt_data = {
-            scenario: {
-                "years": [datetime.now().year + i for i in range(years)],
-                "new_debt": new_debt["Amount"],
-                "debt_repayment": new_debt["Repayment"],
-                "interest_paid": interest_paid
-            }
-        }
-        # Retrieve the latest historical cash balance
-        balance_sheet_inputs = st.session_state.get("balance_sheet_inputs", pd.DataFrame())
-        if not balance_sheet_inputs.empty and "Cash" in balance_sheet_inputs.columns:
-            initial_cash = balance_sheet_inputs.sort_values("Year")["Cash"].iloc[-1]
-        else:
-            initial_cash = 0.0
-
-
-        # Recalculate with real FCF-based interest earned
-        interest_earned, cash_balance = calculate_interest_earned_from_cash_balance(fcf, assumptions, scenario, initial_cash)
-        ebt_pre_workers = [ebit[i] - interest_paid[i] + interest_earned[i] + other_inc[i] - other_exp[i] for i in range(years)]
-        workers_participation = [0.15 * e for e in ebt_pre_workers]
-        taxable_income = [ebt_pre_workers[i] - workers_participation[i] for i in range(years)]
-        taxes = [taxable_income[i] * tax_rate[i] / 100 for i in range(years)]
-        net_income = [taxable_income[i] - taxes[i] for i in range(years)]
-        fcf = [ebit[i] - taxes[i] + depreciation[i] - capex[i] - delta_nwc[i] for i in range(years)]
-
-       
-        # Re-render charts with final FCF
-        cash_flow_df = generate_cash_flow_statement(
-            net_income=net_income,
-            depreciation=depreciation,
-            capex=capex,
-            delta_nwc=delta_nwc,
-            debt_data=debt_data,
-            scenario=scenario,
-            initial_cash = initial_cash
-        )
-
-        st.subheader("Cash Flow Statement")
-        st.dataframe(cash_flow_df.style.format("{:,.2f}"))
-        st.line_chart(cash_flow_df.set_index("Year")["Ending Cash Balance"])
-
-        fcf_df = pd.DataFrame({
-            "Year": assumptions[scenario]["years"],
-            "Free Cash Flow": fcf
-        })
-        st.subheader("Free Cash Flow (FCF)")
-        st.dataframe(fcf_df.style.format({"Free Cash Flow": "{:,.2f}"}))
-        st.line_chart(fcf_df.set_index("Year"))
-
-        # Final output dataframe
-        return pd.DataFrame({
-            "Year": [datetime.now().year + i for i in range(years)],
+        income_statement.append({
+            "Year": year,
             "Revenue": revenue,
             "COGS": cogs,
-            "Admin Expenses": admin_exp,
-            "Sales Expenses": sales_exp,
-            "EBITDA": ebitda,
-            "Depreciation": depreciation,
-            "Amortization": amortization,
+            "Admin Expenses": admin_expenses,
+            "Sales Expenses": sales_expenses,
+            "Other Income": other_income,
+            "D&A": d_a,
             "EBIT": ebit,
-            "Interest Paid": interest_paid,
-            "Interest Earned": interest_earned,
-            "Cash Balance": cash_balance,
-            "Other Income": other_inc,
-            "Other Expenses": other_exp,
-            "EBT (Pre Workers)": ebt_pre_workers,
-            "Workers Participation": workers_participation,
-            "Taxable Income": taxable_income,
+            "Interest Expense": interest_expense,
+            "Interest Income": interest_income,
+            "EBT": ebt,
             "Taxes": taxes,
-            "Net Income": net_income,
-            "Free Cash Flow": fcf
+            "Net Income": net_income
         })
-    base_revenue = st.session_state["historical_data"]["Ingresos"].iloc[-1]
 
-    for scenario in scenarios:
-        st.markdown(f"### Scenario: {scenario}")
-        growth = st.session_state["assumptions"]["Revenue Growth (%)"][scenario]
-        revenue = calculate_revenue(base_revenue, growth)
-        df_proj = generate_income_statement(revenue, st.session_state["assumptions"], scenario)
-        projection_results[scenario] = df_proj
-        st.dataframe(df_proj)
- 
-    def generate_cash_flow_statement(
-        net_income: list,
-        depreciation: list,
-        capex: list,
-        delta_nwc: list,
-        debt_data: dict,
-        scenario: str,
-        initial_cash: float = 0.0
-    ) -> pd.DataFrame:
-        years = debt_data[scenario]["years"]
-        new_debt = debt_data[scenario]["new_debt"]
-        debt_repayment = debt_data[scenario]["debt_repayment"]
-        interest_paid = debt_data[scenario]["interest_paid"]
+        # --- Flujo de Caja ---
+        capex = d_and_a_data.get('capex', {}).get(year, 0)
+        change_in_wcap = 0  # Simplificado por ahora
 
-        cash_from_ops = [
-            net_income[i] + depreciation[i] - delta_nwc[i]
-            for i in range(len(years))
-        ]
-    
-        cash_from_investing = [-capex[i] for i in range(len(years))]
-    
-        cash_from_financing = [
-            new_debt[i] - debt_repayment[i] - interest_paid[i]
-            for i in range(len(years))
-        ]
-    
-        net_cash_flow = [
-            cash_from_ops[i] + cash_from_investing[i] + cash_from_financing[i]
-            for i in range(len(years))
-        ]
+        operating_cf = net_income + d_a - change_in_wcap
+        investing_cf = -capex
+        financing_cf = -debt_data.get("principal_payment", {}).get(year, 0) + debt_data.get("new_debt", {}).get(year, 0)
 
-        ending_cash = []
-        for i in range(len(years)):
-            if i == 0:
-                ending_cash.append(initial_cash + net_cash_flow[i])
-            else:
-                ending_cash.append(ending_cash[i - 1] + net_cash_flow[i])
+        net_cash_flow = operating_cf + investing_cf + financing_cf
+        ending_cash = prev_cash + net_cash_flow
 
-        return pd.DataFrame({
-            "Year": years,
-            "Cash from Operating": cash_from_ops,
-            "Cash from Investing": cash_from_investing,
-            "Cash from Financing": cash_from_financing,
+        cash_flow.append({
+            "Year": year,
+            "Operating CF": operating_cf,
+            "Investing CF": investing_cf,
+            "Financing CF": financing_cf,
             "Net Cash Flow": net_cash_flow,
-            "Ending Cash Balance": ending_cash,
+            "Ending Cash": ending_cash
         })
 
-    def generate_balance_sheet(
-        years: list,
-        revenue: list,
-        ending_cash: list,
-        net_ppe: list,
-        net_intangibles: list,
-        delta_receivables: list,
-        delta_inventory: list,
-        delta_payables: list,
-        debt_data: dict,
-        net_income: list,
-        scenario: str,
-        other_current_assets: list,
-        other_non_current_assets: list,
-        other_current_liabilities: list,
-        other_non_current_liabilities: list,
-        other_equity: list,
-        initial_retained_earnings: float = 0.0,
-    ) -> pd.DataFrame:
+        # --- Balance General ---
+        total_assets = prev_assets + net_cash_flow  # muy simplificado
+        total_liabilities = debt_data.get("ending_balance", {}).get(year, prev_debt)
+        equity = total_assets - total_liabilities
 
-        # Working Capital Items
-        accounts_receivable = [delta_receivables[0]]
-        inventory = [delta_inventory[0]]
-        accounts_payable = [delta_payables[0]]
-    
-        for i in range(1, len(years)):
-            accounts_receivable.append(accounts_receivable[i-1] + delta_receivables[i])
-            inventory.append(inventory[i-1] + delta_inventory[i])
-            accounts_payable.append(accounts_payable[i-1] + delta_payables[i])
-
-        # Retained Earnings
-        retained_earnings = []
-        for i in range(len(years)):
-            if i == 0:
-                retained_earnings.append(initial_retained_earnings + net_income[i])
-            else:
-                retained_earnings.append(retained_earnings[i-1] + net_income[i])
-
-        # Debt
-        short_term_debt = debt_data[scenario]["short_term_debt"]
-        long_term_debt = debt_data[scenario]["long_term_debt"]
-
-        # Total Assets
-        total_assets = [
-            ending_cash[i]
-            + accounts_receivable[i]
-            + inventory[i]
-            + net_ppe[i]
-            + net_intangibles[i]
-            + other_current_assets[i]
-            + other_non_current_assets[i]
-            for i in range(len(years))
-        ]
-
-        # Total Liabilities
-        total_liabilities = [
-            accounts_payable[i]
-            + short_term_debt[i]
-            + long_term_debt[i]
-            + other_current_liabilities[i]
-            + other_non_current_liabilities[i]
-            for i in range(len(years))
-        ]
-
-        # Total Equity
-        total_equity = [
-            retained_earnings[i] + other_equity[i]
-            for i in range(len(years))
-        ]
-
-        return pd.DataFrame({
-            "Year": years,
-            # Assets
+        balance_sheet.append({
+            "Year": year,
             "Cash": ending_cash,
-            "Accounts Receivable": accounts_receivable,
-            "Inventory": inventory,
-            "Other Current Assets": other_current_assets,
-            "Net PPE": net_ppe,
-            "Net Intangibles": net_intangibles,
-            "Other Non-Current Assets": other_non_current_assets,
             "Total Assets": total_assets,
-
-            # Liabilities
-            "Accounts Payable": accounts_payable,
-            "Short-Term Debt": short_term_debt,
-            "Other Current Liabilities": other_current_liabilities,
-            "Long-Term Debt": long_term_debt,
-            "Other Non-Current Liabilities": other_non_current_liabilities,
-            "Total Liabilities": total_liabilities,
-
-            # Equity
-            "Retained Earnings": retained_earnings,
-            "Other Equity": other_equity,
-            "Total Equity": total_equity,
-
-            # Control Total
-            "Total Liabilities + Equity": [
-                total_liabilities[i] + total_equity[i] for i in range(len(years))
-            ]
+            "Debt": total_liabilities,
+            "Equity": equity
         })
+
+        # Actualizar para el siguiente año
+        prev_cash = ending_cash
+        prev_assets = total_assets
+        prev_debt = total_liabilities
+        prev_equity = equity
+
+    # Mostrar en subtabs
+    with subtab_objs[0]:
+        st.subheader("Estado de Resultados")
+        st.dataframe(pd.DataFrame(income_statement))
+
+    with subtab_objs[1]:
+        st.subheader("Flujo de Caja")
+        st.dataframe(pd.DataFrame(cash_flow))
+
+    with subtab_objs[2]:
+        st.subheader("Balance General")
+        st.dataframe(pd.DataFrame(balance_sheet))
   
 # --- Tab 6: Charts ---
 with tabs[5]:
