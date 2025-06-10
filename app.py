@@ -429,8 +429,10 @@ with tabs[4]:
 
     for year in projection_years:
         # --- Estado de Resultados ---
+        assumptions = st.session_state["assumptions"]
+        scenario = st.session_state["selected_scenario"]  # e.g., "Base"
         year_index = year - projection_years[0]
-        growth_rate = assumptions["Revenue Growth (%)"][year_index] / 100
+        growth_rate = assumptions["Revenue Growth (%)"][scenario][year_index] / 100
         revenue = historical_data["Ingresos"][0] * (1 + growth_rate)
         cogs_pct = assumptions["COGS (% of Revenue)"][scenario][year_index]
         cogs = revenue * cogs_pct / 100
