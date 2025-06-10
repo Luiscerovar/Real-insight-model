@@ -300,7 +300,9 @@ with tabs[4]:
 
     # Selección de escenario
     scenario = st.selectbox("Select scenario", ["Base", "Optimistic", "Worst"])
-    assumptions = assumptions_data[scenario]
+    assumptions = {}
+    for name in st.session_state["assumptions"]:
+        assumptions[name] = st.session_state["assumptions"][name][scenario]
 
     # Subtabs: Income Statement, Cash Flow, Balance Sheet
     subtab_labels = ["Estado de Resultados", "Flujo de Caja", "Balance General"]
@@ -310,6 +312,8 @@ with tabs[4]:
     income_statement = []
     cash_flow = []
     balance_sheet = []
+
+    historical_data = st.session_state.get("historical_data", pd.DataFrame())
 
     historical_years = historical_data['Year'].tolist()
     start_year = max(historical_years)
@@ -322,6 +326,93 @@ with tabs[4]:
     prev_equity = last_row["Equity"]
     prev_debt = last_row["Short-term Debt"] + last_row["Long-term Debt"]
 
+    def calculate_debt_schedule(debt_inputs, projection_years):
+        existing_df = debt_inputs["Existing Debt"]
+        new_df = debt_inputs["New Debt Assumptions"]
+
+        short_row = existing_df[existing_df["Type"] == "Short-Term"].iloc[0]
+        long_row = existing_df[existing_df["Type"] == "Long-Term"].iloc[0]
+
+        current_short = short_row["Beginning Balance"]
+        current_long = long_row["Beginning Balance"]
+        rate_short = short_row["Interest Rate (%)"] / 100
+        rate_long = long_row["Interest Rate (%)"] / 100
+        term_short = short_row["Term (Years)"]
+        term_long = long_row["Term (Years)"]
+
+        debt_schedule = {
+            "short_term": {},
+            "long_term": {},
+            "interest_expense": {}
+        }
+
+        for year in projection_years:
+            # Interest on existing debt
+            interest = current_short * rate_short + current_long * rate_long
+
+            # Add new debt this year (if any)
+            row = new_df[new_df["Year"] == year]
+            if not row.empty:
+                new_amt = row["Amount"].values[0]
+                new_rate = row["Interest Rate (%)"].values[0] / 100
+                #new_term = row["Term (Years)"].values[0]
+                interest += new_amt * new_rate
+
+                # Add new debt to long-term (could customize logic here)
+                current_long += new_amt
+
+            # Save schedule
+            debt_schedule["short_term"][year] = current_short
+            debt_schedule["long_term"][year] = current_long
+            debt_schedule["interest_expense"][year] = interest
+
+            # Amortize principal (equal installments)
+            current_short = max(0, current_short - (short_row["Beginning Balance"] / term_short if term_short > 0 else 0))
+            current_long = max(0, current_long - (long_row["Beginning Balance"] / term_long if term_long > 0 else 0))
+
+        return debt_schedule
+
+    def calculate_da_schedule(da_inputs, projection_years):
+            da_by_year = {year: 0 for year in projection_years}
+
+            # Fixed Assets (historical)
+            for _, row in da_inputs["Fixed Assets"].iterrows():
+                cost = row["Historical Cost"]
+                life = int(row["Useful Life (Years)"])
+                annual_dep = cost / life
+                for i in range(min(life, len(projection_years))):
+                    year = projection_years[i]
+                    da_by_year[year] += annual_dep
+
+            # Intangibles (historical)
+            for _, row in da_inputs["Intangibles"].iterrows():
+                cost = row["Historical Cost"]
+                life = int(row["Useful Life (Years)"])
+                annual_amort = cost / life
+                for i in range(min(life, len(projection_years))):
+                    year = projection_years[i]
+                    da_by_year[year] += annual_amort
+
+            # CapEx Forecast
+            for _, row in da_inputs["CapEx Forecast"].iterrows():
+                year = int(row["Year"])
+                capex = row["CapEx"]
+                life = 5  # You can customize this or make it user input later
+                for offset in range(life):
+                    y = year + offset
+                    if y in da_by_year:
+                       da_by_year[y] += capex / life
+
+            return da_by_year
+
+    debt_inputs = st.session_state["debt_inputs"]
+    da_inputs = st.session_state["da_inputs"]
+    debt_data = calculate_debt_schedule(debt_inputs, projection_years)
+    d_and_a_data = calculate_da_schedule(da_inputs, projection_years)
+
+    projected_income_statements = {}
+    projected_cash_flows = {}
+
     for year in projection_years:
         # --- Estado de Resultados ---
         revenue = assumptions["Revenue"][0] * (1 + assumptions["Revenue Growth"]/100) ** (year - projection_years[0])
@@ -329,6 +420,7 @@ with tabs[4]:
         admin_expenses = revenue * assumptions["Admin Expenses %"] / 100
         sales_expenses = revenue * assumptions["Sales Expenses %"] / 100
         other_income = revenue * assumptions["Other Income %"] / 100
+        
 
         # Depreciación y Amortización
         d_a = d_and_a_data.get(year, 0)
@@ -403,6 +495,27 @@ with tabs[4]:
         prev_assets = total_assets
         prev_debt = total_liabilities
         prev_equity = equity
+
+    # Guardar resultados por escenario
+    income_df = pd.DataFrame(income_statement)
+    cash_df = pd.DataFrame(cash_flow)
+    projected_income_statements[scenario] = income_df
+    projected_cash_flows[scenario] = cash_df
+
+    # Construir projection_data para Charts
+    projection_data = {}
+    for scen in projected_income_statements:
+        inc = projected_income_statements[scen]
+        cf = projected_cash_flows[scen]
+        projection_data[scen] = {
+            "Year": inc["Year"],
+            "Revenue": inc["Revenue"],
+            "EBIT": inc["EBIT"],
+            "Net Income": inc["Net Income"],
+            "FCF": cf["Net Cash Flow"]
+        }
+
+    st.session_state["projection_data"] = projection_data
 
     # Mostrar en subtabs
     with subtab_objs[0]:
