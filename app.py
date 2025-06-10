@@ -423,6 +423,9 @@ with tabs[4]:
 
     projected_income_statements = {}
     projected_cash_flows = {}
+    
+    st.write("assumptions structure:", assumptions)
+    st.write("COGS assumption:", assumptions.get("COGS (% of Revenue)", "Missing"))
 
     for year in projection_years:
         # --- Estado de Resultados ---
