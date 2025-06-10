@@ -578,22 +578,28 @@ with tabs[5]:
 with tabs[6]:
     st.subheader("Valuation (Discounted Cash Flow)")
     discount_rate = st.number_input("Discount Rate (%)", value=10.0, step=0.5)
-    valuations = {}
-    for scenario in scenarios:
-        fcf = projection_data[scenario]["FCF"]
-        discounted_fcf = [fcf[i] / (1 + discount_rate / 100) ** (i + 1) for i in range(len(fcf))]
-        valuation = sum(discounted_fcf)
-        valuations[scenario] = valuation
-        st.metric(f"{scenario} Valuation", f"${valuation:,.0f}")
 
-    if st.button("Download Projections to Excel"):
-        output = io.BytesIO()
-        with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-            for scenario in scenarios:
-                projection_data[scenario].to_excel(writer, sheet_name=scenario, index=False)
-        st.download_button(
-            label="Download Excel File",
-            data=output.getvalue(),
-            file_name="financial_model.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        )
+    if projection_data:
+        # Extract the only projection DataFrame
+        df = list(projection_data.values())[0]  # Assumes only one active set of projections
+
+        if "FCF" in df:
+            fcf = df["FCF"]
+            discounted_fcf = [fcf[i] / (1 + discount_rate / 100) ** (i + 1) for i in range(len(fcf))]
+            valuation = sum(discounted_fcf)
+            st.metric("Valuation", f"${valuation:,.0f}")
+        else:
+            st.warning("'FCF' not found in projection data.")
+
+        if st.button("Download Projections to Excel"):
+            output = io.BytesIO()
+            with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+                df.to_excel(writer, sheet_name="Projections", index=False)
+            st.download_button(
+                label="Download Excel File",
+                data=output.getvalue(),
+                file_name="financial_model.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            )
+    else:
+        st.warning("No projection data available. Please complete the Projections tab first.")
