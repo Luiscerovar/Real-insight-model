@@ -315,12 +315,12 @@ with tabs[4]:
 
     historical_data = st.session_state.get("historical_data", pd.DataFrame())
 
-    historical_years = historical_data['Years'].tolist()
+    historical_years = historical_data["Years"].tolist()
     start_year = max(historical_years)
-    projection_years = list(range(start_year + 1, start_year + assumptions['Years'] + 1))
+    projection_years = list(range(start_year + 1, start_year + assumptions["Years"] + 1))
 
     # Valores iniciales desde el último año histórico
-    last_row = historical_data[historical_data['Years'] == start_year].iloc[0]
+    last_row = historical_data[historical_data["Years"] == start_year].iloc[0]
     prev_cash = last_row["Cash"]
     prev_assets = last_row["Total Assets"]
     prev_equity = last_row["Equity"]
