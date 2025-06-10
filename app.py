@@ -556,12 +556,21 @@ with tabs[4]:
 # --- Tab 6: Charts ---
 with tabs[5]:
     st.subheader("Charts")
+    
     metric = st.selectbox("Select Metric", ["Ingresos", "EBIT", "Net Income", "FCF"])
-    chart_df = pd.DataFrame({
-        scenario: projection_data[scenario][metric] for scenario in scenarios
-    })
-    chart_df.index = projection_data[scenarios[0]]["Year"]
-    st.line_chart(chart_df)
+
+    if projection_data:
+        scenario = list(projection_data.keys())[0]  # get the only loaded scenario
+        data = projection_data[scenario]
+
+        if metric in data:
+            chart_df = pd.DataFrame({metric: data[metric]})
+            chart_df.index = data["Year"]
+            st.line_chart(chart_df)
+        else:
+            st.warning(f"'{metric}' not found in projection data.")
+    else:
+        st.warning("No projection data available. Please complete the Projections tab first.")
 
 # --- Tab 7: Valuation ---
 with tabs[6]:
