@@ -321,10 +321,11 @@ with tabs[4]:
 
 
     # Valores iniciales desde el último año histórico
-    balance_sheet = generate_historical_balance_sheet(st.session_state["balance_sheet_inputs"])
+    # Don't overwrite the list `balance_sheet`
+    historical_bs_df = generate_historical_balance_sheet(st.session_state["balance_sheet_inputs"])
 
     # Get the starting values from the latest historical year
-    bs_row = balance_sheet[balance_sheet["Year"] == start_year]
+    bs_row = historical_bs_df[historical_bs_df["Year"] == start_year]
     if bs_row.empty:
         st.error(f"No balance sheet data found for year {start_year}")
         st.stop()
