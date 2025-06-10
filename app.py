@@ -429,10 +429,10 @@ with tabs[4]:
         year_index = year - projection_years[0]
         growth_rate = assumptions["Revenue Growth (%)"][year_index] / 100
         revenue = historical_data["Ingresos"][0] * (1 + growth_rate)
-        cogs = revenue * assumptions["COGS %"] / 100
-        admin_expenses = revenue * assumptions["Admin Expenses %"] / 100
-        sales_expenses = revenue * assumptions["Sales Expenses %"] / 100
-        other_income = revenue * assumptions["Other Income %"] / 100
+        cogs = revenue * assumptions["COGS (% of Revenue)"] / 100
+        admin_expenses = revenue * assumptions["Admin Expenses (% of Revenue)"] / 100
+        sales_expenses = revenue * assumptions["Sales Expenses (% of Revenue)"] / 100
+        other_income = revenue * assumptions["Other Income (% of Revenue)"] / 100
         
 
         # Depreciación y Amortización
