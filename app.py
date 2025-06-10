@@ -556,15 +556,17 @@ with tabs[4]:
 # --- Tab 6: Charts ---
 with tabs[5]:
     st.subheader("Charts")
-    
+
     metric = st.selectbox("Select Metric", ["Ingresos", "EBIT", "Net Income", "FCF"])
 
     if projection_data:
-        scenario = list(projection_data.keys())[0]  # get the only loaded scenario
-        data = projection_data[scenario]
+        # Get the only scenario's data dictionary directly
+        data = list(projection_data.values())[0]
 
         if metric in data:
-            chart_df = pd.DataFrame({metric: data[metric]})
+            chart_df = pd.DataFrame({
+                metric: data[metric]
+            })
             chart_df.index = data["Year"]
             st.line_chart(chart_df)
         else:
