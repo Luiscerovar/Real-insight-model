@@ -458,7 +458,8 @@ with tabs[4]:
         # Impuesto (ajustado por participación de trabajadores)
         workers_participation = 0.15 * ebt if ebt > 0 else 0
         taxable_income = ebt - workers_participation
-        taxes = taxable_income * assumptions["Tax Rate (%)"] / 100 if taxable_income > 0 else 0
+        tax_rate = assumptions["Tax Rate (%)"][year_index]
+        taxes = taxable_income * tax_rate / 100 if taxable_income > 0 else 0
 
         net_income = ebt - taxes
 
