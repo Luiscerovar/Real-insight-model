@@ -317,7 +317,7 @@ with tabs[4]:
 
     historical_years = historical_data["Year"].tolist()
     start_year = max(historical_years)
-    projection_years = list(range(start_year + 1, start_year + st.session_state["Years"] + 1))
+    projection_years = list(range(start_year + 1, start_year + st.session_state["years"] + 1))
 
     # Valores iniciales desde el último año histórico
     last_row = historical_data[historical_data["Year"] == start_year].iloc[0]
