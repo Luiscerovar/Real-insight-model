@@ -450,14 +450,14 @@ with tabs[4]:
 
         # Intereses
         interest_expense = debt_data.get('interest_expense', {}).get(year, 0)
-        interest_income = prev_cash * assumptions["Interest Rate on Cash"] / 100
+        interest_income = prev_cash * assumptions["Interest Rate Earned on Cash (%)"] / 100
 
         ebt = ebit - interest_expense + interest_income
 
         # Impuesto (ajustado por participación de trabajadores)
         workers_participation = 0.15 * ebt if ebt > 0 else 0
         taxable_income = ebt - workers_participation
-        taxes = taxable_income * assumptions["Tax Rate"] / 100 if taxable_income > 0 else 0
+        taxes = taxable_income * assumptions["Tax Rate (%)"] / 100 if taxable_income > 0 else 0
 
         net_income = ebt - taxes
 
