@@ -426,7 +426,7 @@ with tabs[4]:
 
     for year in projection_years:
         # --- Estado de Resultados ---
-        revenue = assumptions["Revenue"][0] * (1 + assumptions["Revenue Growth"]/100) ** (year - projection_years[0])
+        revenue = historical_data["Ingresos"][0] * (1 + assumptions["Revenue Growth"]/100) ** (year - projection_years[0])
         cogs = revenue * assumptions["COGS %"] / 100
         admin_expenses = revenue * assumptions["Admin Expenses %"] / 100
         sales_expenses = revenue * assumptions["Sales Expenses %"] / 100
@@ -454,7 +454,7 @@ with tabs[4]:
 
         income_statement.append({
             "Year": year,
-            "Revenue": revenue,
+            "Ingresos": revenue,
             "COGS": cogs,
             "Admin Expenses": admin_expenses,
             "Sales Expenses": sales_expenses,
@@ -520,7 +520,7 @@ with tabs[4]:
         cf = projected_cash_flows[scen]
         projection_data[scen] = {
             "Year": inc["Year"],
-            "Revenue": inc["Revenue"],
+            "Ingresos": inc["Ingresos"],
             "EBIT": inc["EBIT"],
             "Net Income": inc["Net Income"],
             "FCF": cf["Net Cash Flow"]
@@ -544,7 +544,7 @@ with tabs[4]:
 # --- Tab 6: Charts ---
 with tabs[5]:
     st.subheader("Charts")
-    metric = st.selectbox("Select Metric", ["Revenue", "EBIT", "Net Income", "FCF"])
+    metric = st.selectbox("Select Metric", ["Ingresos", "EBIT", "Net Income", "FCF"])
     chart_df = pd.DataFrame({
         scenario: projection_data[scenario][metric] for scenario in scenarios
     })
