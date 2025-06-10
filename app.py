@@ -430,15 +430,15 @@ with tabs[4]:
     for year in projection_years:
         # --- Estado de Resultados ---
         year_index = year - projection_years[0]
-        growth_rate = assumptions["Revenue Growth (%)"][scenario][year_index] / 100
+        growth_rate = assumptions["Revenue Growth (%)"][year_index] / 100
         revenue = historical_data["Ingresos"][0] * (1 + growth_rate)
-        cogs_pct = assumptions["COGS (% of Revenue)"][scenario][year_index]
+        cogs_pct = assumptions["COGS (% of Revenue)"][year_index]
         cogs = revenue * cogs_pct / 100
-        admin_exp_pct = assumptions["Admin Expenses (% of Revenue)"][scenario][year_index]
+        admin_exp_pct = assumptions["Admin Expenses (% of Revenue)"][year_index]
         admin_expenses = revenue * admin_exp_pct / 100
-        sale_exp_pct = assumptions["Sales Expenses (% of Revenue)"][scenario][year_index]
+        sale_exp_pct = assumptions["Sales Expenses (% of Revenue)"][year_index]
         sales_expenses = revenue * sale_exp_pct / 100
-        other_inc_pct =  assumptions["Other Income (% of Revenue)"][scenario][year_index]
+        other_inc_pct =  assumptions["Other Income (% of Revenue)"][year_index]
         other_income = revenue * other_inc_pct/ 100
         
 
