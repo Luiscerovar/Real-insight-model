@@ -426,7 +426,7 @@ with tabs[4]:
 
     for year in projection_years:
         # --- Estado de Resultados ---
-        revenue = historical_data["Ingresos"][0] * (1 + assumptions["Revenue Growth"]/100) ** (year - projection_years[0])
+        revenue = historical_data["Ingresos"][0] * (1 + assumptions["Revenue Growth (%)"]/100) ** (year - projection_years[0])
         cogs = revenue * assumptions["COGS %"] / 100
         admin_expenses = revenue * assumptions["Admin Expenses %"] / 100
         sales_expenses = revenue * assumptions["Sales Expenses %"] / 100
