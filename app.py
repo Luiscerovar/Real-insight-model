@@ -450,7 +450,8 @@ with tabs[4]:
 
         # Intereses
         interest_expense = debt_data.get('interest_expense', {}).get(year, 0)
-        interest_income = prev_cash * assumptions["Interest Rate Earned on Cash (%)"] / 100
+        interest_rate = assumptions["Interest Rate Earned on Cash (%)"][year_index]
+        interest_income = prev_cash * interest_rate / 100
 
         ebt = ebit - interest_expense + interest_income
 
