@@ -326,6 +326,9 @@ with tabs[4]:
     prev_equity = last_row["Equity"]
     prev_debt = last_row["Short-term Debt"] + last_row["Long-term Debt"]
 
+    st.write("Balance Sheet Columns:", balance_sheet.columns)
+    st.write("Last row:", last_row)
+
     def calculate_debt_schedule(debt_inputs, projection_years):
         existing_df = debt_inputs["Existing Debt"]
         new_df = debt_inputs["New Debt Assumptions"]
