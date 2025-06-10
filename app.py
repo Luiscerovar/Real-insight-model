@@ -319,14 +319,22 @@ with tabs[4]:
     start_year = max(historical_years)
     projection_years = list(range(start_year + 1, start_year + st.session_state["years"] + 1))
 
-    st.write("Balance Sheet Columns:", balance_sheet.columns)
 
     # Valores iniciales desde el último año histórico
-    last_row = historical_data[historical_data["Year"] == start_year].iloc[0]
-    prev_cash = last_row["Cash"]
-    prev_assets = last_row["Total Assets"]
-    prev_equity = last_row["Equity"]
-    prev_debt = last_row["Short-term Debt"] + last_row["Long-term Debt"]
+    balance_sheet_inputs = st.session_state.get("balance_sheet_inputs", pd.DataFrame())
+
+    # Get balance sheet values for the start year
+    bs_row = balance_sheet_inputs[balance_sheet_inputs["Year"] == start_year]
+    if bs_row.empty:
+        st.error(f"No balance sheet inputs found for year {start_year}")
+        st.stop()
+
+    bs_row = bs_row.iloc[0]
+
+    prev_cash = bs_row["Cash"]
+    prev_assets = bs_row["Total Assets"]
+    prev_equity = bs_row["Equity"]
+    prev_debt = bs_row["Short-term Debt"] + bs_row["Long-term Debt"]
 
 
     def calculate_debt_schedule(debt_inputs, projection_years):
