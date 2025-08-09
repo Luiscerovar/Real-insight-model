@@ -332,6 +332,17 @@ with tabs[4]:
 
     bs_row = bs_row.iloc[0]
 
+    prev_ppe = float(bs_row["Net PPE"])
+    other_assets_static = float(prev_assets - prev_cash - prev_ppe)
+    prev_total_liabilities = float(bs_row["Total Liabilities"])
+    other_liabilities_static = float(prev_total_liabilities - prev_debt)
+
+    prev_revenue = float(historical_data.loc[historical_data["Year"] == start_year, "Ingresos"].iloc[0])
+    prev_cogs = float(historical_data.loc[historical_data["Year"] == start_year, "Costo de Ventas"].iloc[0])
+    prev_ar = prev_revenue * assumptions["Days Receivables"][0] / 365.0
+    prev_inv = prev_cogs * assumptions["Days Inventory"][0] / 365.0
+    prev_ap = prev_cogs * assumptions["Days Payables"][0] / 365.0
+
     prev_cash = bs_row["Cash"]
     prev_assets = bs_row["Total Assets"]
     prev_equity = bs_row["Total Equity"]
@@ -339,83 +350,110 @@ with tabs[4]:
 
 
     def calculate_debt_schedule(debt_inputs, projection_years):
-        existing_df = debt_inputs["Existing Debt"]
-        new_df = debt_inputs["New Debt Assumptions"]
+        existing_df = debt_inputs["Existing Debt"].copy()
+        new_df = debt_inputs["New Debt Assumptions"].copy()
 
-        short_row = existing_df[existing_df["Type"] == "Short-Term"].iloc[0]
-        long_row = existing_df[existing_df["Type"] == "Long-Term"].iloc[0]
+        short = existing_df[existing_df["Type"] == "Short-Term"].iloc[0]
+        long = existing_df[existing_df["Type"] == "Long-Term"].iloc[0]
 
-        current_short = short_row["Beginning Balance"]
-        current_long = long_row["Beginning Balance"]
-        rate_short = short_row["Interest Rate (%)"] / 100
-        rate_long = long_row["Interest Rate (%)"] / 100
-        term_short = short_row["Term (Years)"]
-        term_long = long_row["Term (Years)"]
+        current_short = float(short["Beginning Balance"])
+        current_long = float(long["Beginning Balance"])
+        rate_short = float(short["Interest Rate (%)"]) / 100.0
+        rate_long = float(long["Interest Rate (%)"]) / 100.0
+        remaining_short_years = int(short["Term (Years)"]) or 0
+        remaining_long_years = int(long["Term (Years)"]) or 0
+        base_short_principal = (current_short / remaining_short_years) if remaining_short_years > 0 else 0.0
+        base_long_principal = (current_long / remaining_long_years) if remaining_long_years > 0 else 0.0
 
-        debt_schedule = {
+        # Track principal for new issuances by year
+        new_long_principal_by_year = {}
+
+        schedule = {
             "short_term": {},
             "long_term": {},
-            "interest_expense": {}
+            "interest_expense": {},
+            "principal_payment": {},
+            "new_debt": {},
+            "ending_balance": {}
         }
 
         for year in projection_years:
-            # Interest on existing debt
-            interest = current_short * rate_short + current_long * rate_long
+            beginning_short = current_short
+            beginning_long = current_long
 
-            # Add new debt this year (if any)
+            # New debt this year (added to long-term)
             row = new_df[new_df["Year"] == year]
-            if not row.empty:
-                new_amt = row["Amount"].values[0]
-                new_rate = row["Interest Rate (%)"].values[0] / 100
-                #new_term = row["Term (Years)"].values[0]
-                interest += new_amt * new_rate
+            new_amount = float(row["Amount"].values[0]) if not row.empty else 0.0
+            new_rate = float(row["Interest Rate (%)"].values[0]) / 100.0 if not row.empty else 0.0
+            new_term = int(row["Term (Years)"].values[0]) if not row.empty else 0
 
-                # Add new debt to long-term (could customize logic here)
-                current_long += new_amt
+            if new_amount > 0:
+                current_long += new_amount
+                if new_term > 0:
+                    annual_p = new_amount / new_term
+                    for i in range(1, new_term + 1):
+                        new_long_principal_by_year[year + i] = new_long_principal_by_year.get(year + i, 0.0) + annual_p
 
-            # Save schedule
-            debt_schedule["short_term"][year] = current_short
-            debt_schedule["long_term"][year] = current_long
-            debt_schedule["interest_expense"][year] = interest
+            # Interest (simple approximation)
+            interest = beginning_short * rate_short + beginning_long * rate_long + new_amount * new_rate
 
-            # Amortize principal (equal installments)
-            current_short = max(0, current_short - (short_row["Beginning Balance"] / term_short if term_short > 0 else 0))
-            current_long = max(0, current_long - (long_row["Beginning Balance"] / term_long if term_long > 0 else 0))
+            # Principal due this year
+            pay_short = base_short_principal if remaining_short_years > 0 else 0.0
+            pay_long_base = base_long_principal if remaining_long_years > 0 else 0.0
+            pay_long_new = new_long_principal_by_year.get(year, 0.0)
 
-        return debt_schedule
+            total_principal = min(pay_short, current_short) + min(pay_long_base + pay_long_new, current_long)
+
+            # Apply payments
+            current_short = max(0.0, current_short - pay_short)
+            current_long = max(0.0, current_long - (pay_long_base + pay_long_new))
+
+            remaining_short_years = max(0, remaining_short_years - 1)
+            remaining_long_years = max(0, remaining_long_years - 1)
+
+            schedule["short_term"][year] = current_short
+            schedule["long_term"][year] = current_long
+            schedule["interest_expense"][year] = interest
+            schedule["principal_payment"][year] = total_principal
+            schedule["new_debt"][year] = new_amount
+            schedule["ending_balance"][year] = current_short + current_long
+
+        return schedule
 
     def calculate_da_schedule(da_inputs, projection_years):
-            da_by_year = {year: 0 for year in projection_years}
+        da_by_year = {year: 0.0 for year in projection_years}
+        capex_by_year = {year: 0.0 for year in projection_years}
 
-            # Fixed Assets (historical)
-            for _, row in da_inputs["Fixed Assets"].iterrows():
-                cost = row["Historical Cost"]
-                life = int(row["Useful Life (Years)"])
-                annual_dep = cost / life
-                for i in range(min(life, len(projection_years))):
-                    year = projection_years[i]
-                    da_by_year[year] += annual_dep
+        # Fixed Assets (historical)
+        for _, row in da_inputs["Fixed Assets"].iterrows():
+            cost = float(row["Historical Cost"])
+            life = int(row["Useful Life (Years)"]) or 1
+            annual = cost / life
+            for y in projection_years[:life]:
+                da_by_year[y] += annual
 
-            # Intangibles (historical)
-            for _, row in da_inputs["Intangibles"].iterrows():
-                cost = row["Historical Cost"]
-                life = int(row["Useful Life (Years)"])
-                annual_amort = cost / life
-                for i in range(min(life, len(projection_years))):
-                    year = projection_years[i]
-                    da_by_year[year] += annual_amort
+        # Intangibles (historical)
+        for _, row in da_inputs["Intangibles"].iterrows():
+            cost = float(row["Historical Cost"])
+            life = int(row["Useful Life (Years)"]) or 1
+            annual = cost / life
+            for y in projection_years[:life]:
+                da_by_year[y] += annual
 
-            # CapEx Forecast
-            for _, row in da_inputs["CapEx Forecast"].iterrows():
-                year = int(row["Year"])
-                capex = row["CapEx"]
-                life = 5  # You can customize this or make it user input later
-                for offset in range(life):
-                    y = year + offset
-                    if y in da_by_year:
-                       da_by_year[y] += capex / life
+        # CapEx Forecast and resulting depreciation (straight-line over 10 years)
+        default_life = 10
+        for _, row in da_inputs["CapEx Forecast"].iterrows():
+            year = int(row["Year"])
+            capex = float(row["CapEx"])
+            if year in capex_by_year:
+                capex_by_year[year] += capex
+            annual = capex / default_life
+            for i in range(default_life):
+                y = year + i
+                if y in da_by_year:
+                    da_by_year[y] += annual
 
-            return da_by_year
+        return {"da": da_by_year, "capex": capex_by_year}
 
     debt_inputs = st.session_state["debt_inputs"]
     da_inputs = st.session_state["da_inputs"]
@@ -424,17 +462,14 @@ with tabs[4]:
 
     projected_income_statements = {}
     projected_cash_flows = {}
-    
-    st.write("assumptions structure:", assumptions)
-    st.write("COGS assumption:", assumptions.get("COGS (% of Revenue)", "Missing"))
 
     for year in projection_years:
         # --- Estado de Resultados ---
         year_index = year - projection_years[0]
-        growth_rate = assumptions["Revenue Growth (%)"][year_index] / 100
-        revenue = historical_data["Ingresos"][0] * (1 + growth_rate)
+        growth_rate = assumptions["Revenue Growth (%)"][year_index] / 100.0
+        revenue = prev_revenue * (1.0 + growth_rate)
         cogs_pct = assumptions["COGS (% of Revenue)"][year_index]
-        cogs = revenue * cogs_pct / 100
+        cogs = revenue * cogs_pct / 100.0
         admin_exp_pct = assumptions["Admin Expenses (% of Revenue)"][year_index]
         admin_expenses = revenue * admin_exp_pct / 100
         sale_exp_pct = assumptions["Sales Expenses (% of Revenue)"][year_index]
@@ -444,15 +479,25 @@ with tabs[4]:
         
 
         # Depreciación y Amortización
-        d_a = d_and_a_data.get(year, 0)
+        d_a = d_and_a_data["da"].get(year, 0.0)
+        capex = d_and_a_data["capex"].get(year, 0.0)
 
         # EBIT
         ebit = revenue - cogs - admin_expenses - sales_expenses + other_income - d_a
 
         # Intereses
-        interest_expense = debt_data.get('interest_expense', {}).get(year, 0)
+        interest_expense = debt_data.get("interest_expense", {}).get(year, 0.0)
         interest_rate = assumptions["Interest Rate Earned on Cash (%)"][year_index]
-        interest_income = prev_cash * interest_rate / 100
+        interest_income = prev_cash * interest_rate / 100.0
+
+        days_rec = assumptions["Days Receivables"][year_index]
+        days_inv = assumptions["Days Inventory"][year_index]
+        days_pay = assumptions["Days Payables"][year_index]
+
+        ar = revenue * days_rec / 365.0
+        inv = cogs * days_inv / 365.0
+        ap = cogs * days_pay / 365.0
+        change_in_wcap = (ar - prev_ar) + (inv - prev_inv) - (ap - prev_ap)
 
         ebt = ebit - interest_expense + interest_income
 
@@ -486,7 +531,9 @@ with tabs[4]:
 
         operating_cf = net_income + d_a - change_in_wcap
         investing_cf = -capex
-        financing_cf = -debt_data.get("principal_payment", {}).get(year, 0) + debt_data.get("new_debt", {}).get(year, 0)
+        principal_payment = debt_data.get("principal_payment", {}).get(year, 0.0)
+        new_debt_year = debt_data.get("new_debt", {}).get(year, 0.0)
+        financing_cf = -principal_payment + new_debt_year
 
         net_cash_flow = operating_cf + investing_cf + financing_cf
         ending_cash = prev_cash + net_cash_flow
@@ -501,8 +548,9 @@ with tabs[4]:
         })
 
         # --- Balance General ---
-        total_assets = prev_assets + net_cash_flow  # muy simplificado
-        total_liabilities = debt_data.get("ending_balance", {}).get(year, prev_debt)
+        ppe = prev_ppe + capex - d_a
+        total_assets = ending_cash + ppe + other_assets_static
+        total_liabilities = other_liabilities_static + debt_data.get("ending_balance", {}).get(year, prev_debt)
         equity = total_assets - total_liabilities
 
         balance_sheet.append({
@@ -516,14 +564,150 @@ with tabs[4]:
         # Actualizar para el siguiente año
         prev_cash = ending_cash
         prev_assets = total_assets
-        prev_debt = total_liabilities
+        prev_debt = total_liabilities - other_liabilities_static
         prev_equity = equity
+        prev_ppe = ppe
+        prev_revenue = revenue
+        prev_cogs = cogs
+        prev_ar, prev_inv, prev_ap = ar, inv, ap
 
-    # Guardar resultados por escenario
+
+    def build_er_df(income_rows: list[dict]) -> pd.DataFrame:
+        df = pd.DataFrame(income_rows)
+        cols = ["Year","Ingresos","COGS","Admin Expenses","Sales Expenses","Other Income","D&A","EBIT","Interest Expense","Interest Income","EBT","Taxes","Net Income"]
+        df = df[cols].copy()
+
+        rows = [
+            ("VENTAS NETAS", "Ingresos"),
+            ("(-) COSTO DE VENTAS", "COGS"),
+            ("UTILIDAD BRUTA", df["Ingresos"] - df["COGS"]),
+            ("(-) GASTOS DE ADMINISTRACION", "Admin Expenses"),
+            ("(-) GASTOS DE VENTAS", "Sales Expenses"),
+            ("UTILIDAD ANTES DE DEP Y AMORT (EBITDA)", (df["Ingresos"] - df["COGS"] - df["Admin Expenses"] - df["Sales Expenses"])),
+            ("(-) DEPRECIACION Y AMORTIZACION", "D&A"),
+            ("UTILIDAD OPERATIVA (EBIT)", "EBIT"),
+            ("(+) OTROS INGRESOS NO OPERATIVOS", "Other Income"),
+            ("UTILIDAD ANTES DE IMPUESTOS (EBT) (después de int.)", df["EBT"]),
+            ("(-) IMPUESTOS", "Taxes"),
+            ("UTILIDAD NETA", "Net Income")
+        ]
+
+        out = []
+        years = df["Year"].tolist()
+        for label, source in rows:
+            if isinstance(source, str):
+                series = df[source].values
+            else:
+                series = source.values
+            out.append(pd.Series(series, name=label))
+        er = pd.concat(out, axis=1).T
+        er.columns = [pd.to_datetime(f"{y}-12-31") for y in years]
+        return er
+
+    def build_bg_df(balance_rows: list[dict], ar_series: dict[int,float], inv_series: dict[int,float], ap_series: dict[int,float], ppe_series: dict[int,float]) -> pd.DataFrame:
+        df = pd.DataFrame(balance_rows)
+        years = df["Year"].tolist()
+        cash = df.set_index("Year")["Cash"]
+        total_assets = df.set_index("Year")["Total Assets"]
+        debt = df.set_index("Year")["Debt"]
+        equity = df.set_index("Year")["Equity"]
+
+        # Map WC and PPE from your loop
+        ar = pd.Series({y: ar_series.get(y, 0.0) for y in years})
+        inv = pd.Series({y: inv_series.get(y, 0.0) for y in years})
+        ap = pd.Series({y: ap_series.get(y, 0.0) for y in years})
+        ppe = pd.Series({y: ppe_series.get(y, 0.0) for y in years})
+
+        rows = [
+            ("ACTIVO", None),
+            ("CAJA Y BANCOS", cash.values),
+            ("CUENTAS POR COBRAR COMERCIALES", ar.values),
+            ("(-) PROVISION CUENTAS INCOBRABLES COMERCIALES", np.zeros(len(years))),  # keep 0 unless you model it
+            ("INVENTARIOS", inv.values),
+            ("PROPIEDAD PLANTA Y EQUIPO, NETO", ppe.values),
+            ("TOTAL ACTIVOS", total_assets.values),
+            ("PASIVO Y PATRIMONIO", None),
+            ("DEUDA TOTAL", debt.values),
+            ("PATRIMONIO", equity.values),
+            ("TOTAL PASIVO + PATRIMONIO", (debt + equity).values),
+        ]
+
+        out = []
+        for label, series in rows:
+            if series is None:
+                s = pd.Series([np.nan] * len(years), name=label)
+            else:
+                s = pd.Series(series, name=label)
+            out.append(s)
+        bg = pd.concat(out, axis=1).T
+        bg.columns = [pd.to_datetime(f"{y}-12-31") for y in years]
+        return bg
+
+    def build_flujo_df(income_rows: list[dict], cash_rows: list[dict], wc_changes: dict[int,dict[str,float]], capex_by_year: dict[int,float], debt_sched: dict) -> pd.DataFrame:
+        inc = pd.DataFrame(income_rows).set_index("Year")
+        cash = pd.DataFrame(cash_rows).set_index("Year")
+        years = inc.index.tolist()
+
+        d_a = inc["D&A"]
+        net_income = inc["Net Income"]
+
+        # WC deltas from your loop (provide dict per year with keys: delta_ar, delta_inv, delta_ap)
+        delta_ar = pd.Series({y: wc_changes.get(y, {}).get("delta_ar", 0.0) for y in years})
+        delta_inv = pd.Series({y: wc_changes.get(y, {}).get("delta_inv", 0.0) for y in years})
+        delta_ap = pd.Series({y: wc_changes.get(y, {}).get("delta_ap", 0.0) for y in years})
+        change_in_wcap = delta_ar + delta_inv - delta_ap
+
+        capex = pd.Series({y: capex_by_year.get(y, 0.0) for y in years})
+        principal = pd.Series({y: debt_sched.get("principal_payment", {}).get(y, 0.0) for y in years})
+        new_debt = pd.Series({y: debt_sched.get("new_debt", {}).get(y, 0.0) for y in years})
+
+        operating_cf = net_income + d_a - change_in_wcap
+        investing_cf = -capex
+        financing_cf = -principal + new_debt
+        net_cf = operating_cf + investing_cf + financing_cf
+
+        rows = [
+            ("FLUJO DE EFECTIVO GENERADO POR  ACT. DE OPERACIÓN", None),
+            ("Utilidad Neta", net_income.values),
+            ("(+) Depreciacion, Amortizacion Y Provisiones", d_a.values),
+            ("Cambio Ctas por Cobrar Comerciales", delta_ar.values),
+            ("Cambio Inventarios", delta_inv.values),
+            ("Cambio Ctas por Pagar Comerciales", delta_ap.values),
+            ("Flujo Operación", operating_cf.values),
+            ("FLUJO DE EFECTIVO DE ACTIVIDADES DE INVERSION", None),
+            ("(-) Compra de Activos Fijos (CapEx)", (-capex).values),
+            ("Flujo Inversión", investing_cf.values),
+            ("FLUJO DE EFECTIVO DE ACTIVIDADES DE FINANCIAMIENTO", None),
+            ("(-) Amortización de Deuda", (-principal).values),
+            ("(+) Nueva Deuda", new_debt.values),
+            ("Flujo Financiamiento", financing_cf.values),
+            ("AUMENTO (DISMINUCIÓN) NETO DE EFECTIVO", net_cf.values),
+            ("EFECTIVO FINAL", cash["Ending Cash"].reindex(years).values),
+        ]
+
+        out = []
+        for label, series in rows:
+            s = pd.Series([np.nan]*len(years), name=label) if series is None else pd.Series(series, name=label)
+            out.append(s)
+        flujo = pd.concat(out, axis=1).T
+        flujo.columns = [pd.to_datetime(f"{y}-12-31") for y in years]
+        return flujo
+
+     # Guardar resultados por escenario
     income_df = pd.DataFrame(income_statement)
     cash_df = pd.DataFrame(cash_flow)
-    projected_income_statements[scenario] = income_df
-    projected_cash_flows[scenario] = cash_df
+    balance_df = pd.DataFrame(balance_sheet)
+
+    proj_df = pd.DataFrame({
+        "Year": income_df["Year"],
+        "Ingresos": income_df["Ingresos"],
+        "EBIT": income_df["EBIT"],
+        "Net Income": income_df["Net Income"],
+        "FCF": cash_df["Net Cash Flow"]
+    })
+
+    st.session_state.setdefault("projection_data", {})
+    st.session_state["projection_data"][scenario] = proj_df
 
     # Construir projection_data para Charts
     projection_data = {}
@@ -556,44 +740,33 @@ with tabs[4]:
 # --- Tab 6: Charts ---
 with tabs[5]:
     st.subheader("Charts")
-
     metric = st.selectbox("Select Metric", ["Ingresos", "EBIT", "Net Income", "FCF"])
 
-    if projection_data:
-        # Get the only scenario's data dictionary directly
-        data = list(projection_data.values())[0]
-
-        if metric in data:
-            chart_df = pd.DataFrame({
-                metric: data[metric]
-            })
-            chart_df.index = data["Year"]
-            st.line_chart(chart_df)
-        else:
-            st.warning(f"'{metric}' not found in projection data.")
+    available = st.session_state.get("projection_data", {})
+    scen = st.selectbox("Scenario", list(available.keys()) or ["Base"])
+    if scen in available:
+        df_plot = available[scen]
+        st.line_chart(df_plot.set_index("Year")[[metric]])
     else:
-        st.warning("No projection data available. Please complete the Projections tab first.")
+        st.warning("No projection data available. Please run the Projections tab.")
 
 # --- Tab 7: Valuation ---
 with tabs[6]:
     st.subheader("Valuation (Discounted Cash Flow)")
     discount_rate = st.number_input("Discount Rate (%)", value=10.0, step=0.5)
 
-    if projection_data:
-        # Extract the only projection DataFrame
-        df = list(projection_data.values())[0]  # Assumes only one active set of projections
-
-        if "FCF" in df:
-            fcf = df["FCF"]
-            discounted_fcf = [fcf[i] / (1 + discount_rate / 100) ** (i + 1) for i in range(len(fcf))]
-            valuation = sum(discounted_fcf)
-            st.metric("Valuation", f"${valuation:,.0f}")
-        else:
-            st.warning("'FCF' not found in projection data.")
+    available = st.session_state.get("projection_data", {})
+    scen = st.selectbox("Scenario", list(available.keys()) or ["Base"], key="valuation_scenario")
+    if scen in available:
+        df = available[scen]
+        fcf = df["FCF"].tolist()
+        discounted_fcf = [fcf[i] / (1 + discount_rate / 100.0) ** (i + 1) for i in range(len(fcf))]
+        valuation = float(np.nansum(discounted_fcf))
+        st.metric("Valuation", f"${valuation:,.0f}")
 
         if st.button("Download Projections to Excel"):
             output = io.BytesIO()
-            with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+            with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
                 df.to_excel(writer, sheet_name="Projections", index=False)
             st.download_button(
                 label="Download Excel File",
