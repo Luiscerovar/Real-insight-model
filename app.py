@@ -332,21 +332,24 @@ with tabs[4]:
 
     bs_row = bs_row.iloc[0]
 
+    # Initialize prior-year positions first
+    prev_cash = float(bs_row["Cash"])
+    prev_assets = float(bs_row["Total Assets"])
+    prev_equity = float(bs_row["Total Equity"])
+    prev_debt = float(bs_row["Short-Term Debt"] + bs_row["Long-Term Debt"])
+
+    # Derive static components directly from bs_row to avoid ordering issues
     prev_ppe = float(bs_row["Net PPE"])
-    other_assets_static = float(prev_assets - prev_cash - prev_ppe)
+    other_assets_static = float(bs_row["Total Assets"] - bs_row["Cash"] - bs_row["Net PPE"])
     prev_total_liabilities = float(bs_row["Total Liabilities"])
     other_liabilities_static = float(prev_total_liabilities - prev_debt)
 
+    # Revenue/COGS baseline and starting WC
     prev_revenue = float(historical_data.loc[historical_data["Year"] == start_year, "Ingresos"].iloc[0])
     prev_cogs = float(historical_data.loc[historical_data["Year"] == start_year, "Costo de Ventas"].iloc[0])
     prev_ar = prev_revenue * assumptions["Days Receivables"][0] / 365.0
     prev_inv = prev_cogs * assumptions["Days Inventory"][0] / 365.0
     prev_ap = prev_cogs * assumptions["Days Payables"][0] / 365.0
-
-    prev_cash = bs_row["Cash"]
-    prev_assets = bs_row["Total Assets"]
-    prev_equity = bs_row["Total Equity"]
-    prev_debt = bs_row["Short-Term Debt"] + bs_row["Long-Term Debt"]
 
 
     def calculate_debt_schedule(debt_inputs, projection_years):
@@ -526,9 +529,6 @@ with tabs[4]:
         })
 
         # --- Flujo de Caja ---
-        capex = d_and_a_data.get('capex', {}).get(year, 0)
-        change_in_wcap = 0  # Simplificado por ahora
-
         operating_cf = net_income + d_a - change_in_wcap
         investing_cf = -capex
         principal_payment = debt_data.get("principal_payment", {}).get(year, 0.0)
@@ -709,20 +709,7 @@ with tabs[4]:
     st.session_state.setdefault("projection_data", {})
     st.session_state["projection_data"][scenario] = proj_df
 
-    # Construir projection_data para Charts
-    projection_data = {}
-    for scen in projected_income_statements:
-        inc = projected_income_statements[scen]
-        cf = projected_cash_flows[scen]
-        projection_data[scen] = {
-            "Year": inc["Year"],
-            "Ingresos": inc["Ingresos"],
-            "EBIT": inc["EBIT"],
-            "Net Income": inc["Net Income"],
-            "FCF": cf["Net Cash Flow"]
-        }
-
-    st.session_state["projection_data"] = projection_data
+    # Keep scenario DataFrame stored without clearing previous scenarios
 
     # Mostrar en subtabs
     with subtab_objs[0]:
